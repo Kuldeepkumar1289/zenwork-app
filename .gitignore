@@ -1,0 +1,34 @@
+# Byte-compiled / optimized files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual Environment
+venv/
+.venv/
+env/
+
+# Environment Variables & Secrets (Kabhi push na karein)
+.env
+.env.*
+!.env.example
+
+# Uploaded Files & Media (Folder structure rahega, files ignore hongi)
+uploads/*
+!uploads/.gitkeep
+!uploads/voice_notes/.gitkeep
+
+# IDEs & Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Database & SQLite files (agar local test DB banaya ho)
+*.sqlite3
+*.db
+
+# Logs & OS Specific
+*.log
+.DS_Store
+Thumbs.db

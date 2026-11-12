@@ -1,0 +1,248 @@
+/* =========================================================
+   ZENWORK DAYLIGHT — styles
+   1. Tokens   2. Base   3. Layout   4. Components
+   5. Hero & sky   6. Cards & tables   7. Modal & forms   8. Responsive
+   ========================================================= */
+
+/* ---------- 1. TOKENS (theme.js rewrites the colour ones every minute) ---------- */
+:root {
+  --bg1: #bfe3d6;  --bg2: #f3efd9;           /* sky gradient          */
+  --ink: #10372c;  --muted: #10372cb3;       /* text                  */
+  --line: #10372c33;                         /* borders               */
+  --glass: #ffffff8c;                        /* card surface          */
+  --accent: #1d6b52; --accent-ink: #fff;     /* buttons, active nav   */
+  --sun: #f2a93b;
+  --radius: 24px;
+  --font-display: "Bricolage Grotesque", Figtree, system-ui, sans-serif;
+  --font-body: Figtree, system-ui, sans-serif;
+}
+
+/* ---------- 2. BASE ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: var(--font-body); color: var(--ink);
+  background: linear-gradient(180deg, var(--bg1), var(--bg2) 75%) fixed;
+}
+h1, h2 { font-family: var(--font-display); margin: 0; letter-spacing: -.02em; }
+h2 { font-size: 17px; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+small { display: block; font-size: 12px; color: var(--muted); }
+.muted { color: var(--muted); }
+.hidden { display: none !important; }
+.push { margin-left: auto; }
+.right { text-align: right; }
+
+/* ---------- 3. LAYOUT: sidebar | main | right rail ---------- */
+.app { display: flex; height: 100vh; gap: 16px; padding: 16px; }
+.sidebar { width: 245px; flex: none; display: flex; flex-direction: column; padding: 16px 12px; overflow-y: auto; }
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.content { flex: 1; overflow-y: auto; padding: 4px 4px 40px; display: flex; flex-direction: column; gap: 18px; }
+#section-dashboard { display: flex; flex-direction: column; gap: 18px; }
+.rail { width: 310px; flex: none; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
+.rail .grow { flex: 1; }
+
+/* ---------- 4. COMPONENTS ---------- */
+.glass { background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: var(--radius) var(--radius) var(--radius) 8px; }
+
+/* buttons */
+.btn { border: 1px solid transparent; border-radius: 999px; padding: 8px 16px; font-weight: 500; font-size: 13px; transition: transform .2s, filter .2s; }
+.btn:hover { transform: translateY(-1px); filter: brightness(1.08); }
+.btn-primary { background: var(--accent); color: var(--accent-ink); }
+.btn-ghost { background: #ffffff59; border-color: var(--line); }
+.btn.wide { width: 100%; }
+.link { background: none; border: 0; padding: 4px 6px; border-radius: 8px; color: var(--accent); font-weight: 600; font-size: 12px; }
+.link:hover { background: #ffffff40; }
+.danger { color: #c0392b; }
+
+/* chips & badges */
+.chip { display: inline-flex; align-items: center; gap: 6px; font-style: normal; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; background: #10372c1f; }
+.badge { margin-left: auto; font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 8px; background: #10372c1f; }
+.dot { width: 7px; height: 7px; border-radius: 50%; background: #9aa; }
+
+/* sidebar */
+.brand { display: flex; align-items: center; gap: 9px; font: 800 21px var(--font-display); padding: 0 6px 12px; }
+.brand-mark { width: 30px; height: 30px; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); border-radius: 50% 50% 50% 8px; font-size: 15px; }
+.workspace-chip { border: 1px solid var(--line); border-radius: 16px; padding: 10px 12px; background: #ffffff40; margin-bottom: 8px; }
+.workspace-chip b { font-size: 13px; }
+.nav { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.nav-group { margin: 12px 8px 4px; font-size: 12.5px; color: var(--muted); }
+.nav-item { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; border: 0; border-radius: 14px; background: transparent; text-align: left; font-size: 13.5px; font-weight: 500; transition: background .2s, transform .2s; }
+.nav-item:hover { background: #ffffff40; transform: translateX(3px); }
+.nav-item.is-active { background: var(--accent); color: var(--accent-ink); }
+.promo { display: flex; flex-direction: column; gap: 4px; padding: 14px; border-radius: 18px; background: #ffffff40; border: 1px solid var(--line); margin-top: 12px; font-size: 13px; }
+.promo span { color: var(--muted); font-size: 12px; }
+.promo .btn { margin-top: 6px; }
+.foot-links { display: flex; justify-content: space-between; padding: 10px 6px 0; }
+.foot-links button { background: none; border: 0; font-size: 12px; color: var(--muted); font-weight: 500; }
+
+/* top bar */
+.topbar { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 4px 4px 14px; }
+.crumb { font-size: 13px; color: var(--muted); }
+.crumb b { color: var(--ink); }
+.search { position: relative; flex: 1; max-width: 360px; margin: 0 auto 0 8px; }
+.search input { width: 100%; padding: 9px 52px 9px 16px; border-radius: 999px; border: 1px solid var(--line); background: var(--glass); outline: 0; }
+.search kbd { position: absolute; right: 10px; top: 8px; font: inherit; font-size: 11px; color: var(--muted); border: 1px solid var(--line); border-radius: 6px; padding: 1px 6px; }
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+.icon-btn { position: relative; width: 34px; height: 34px; border-radius: 50%; border: 1px solid var(--line); background: var(--glass); }
+.notif-dot { position: absolute; top: 6px; right: 6px; width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+.profile { display: flex; align-items: center; gap: 10px; padding: 4px 10px 4px 4px; border-radius: 999px; cursor: pointer; }
+.profile:hover { background: #ffffff40; }
+.profile b { font-size: 13px; }
+.avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px; }
+
+/* ---------- 5. HERO & SKY (the one memorable element) ---------- */
+.hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.hero h1 { font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.05; margin: 6px 0; }
+.kicker { margin: 0; font-size: 13px; color: var(--muted); }
+.hero-actions { display: flex; gap: 10px; align-items: center; }
+.sky-wrap { margin-top: -6px; }
+#sky { width: 100%; height: auto; display: block; overflow: visible; }
+#sky text { font-size: 11px; fill: var(--muted); }
+.scrub { display: flex; align-items: center; gap: 12px; font-size: 13px; }
+.scrub input { flex: 1; accent-color: var(--accent); }
+.scrub output { min-width: 5.5ch; font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- 6. CARDS, STATS, TABLE ---------- */
+.card { padding: 18px 20px; }
+.card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
+.stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
+.stat { padding: 16px 18px; display: flex; flex-direction: column; gap: 8px; }
+.stat:nth-child(even) { border-radius: 8px var(--radius) var(--radius) var(--radius); }
+.stat > span { font-size: 13px; color: var(--muted); }
+.stat > div { display: flex; align-items: flex-end; justify-content: space-between; }
+.stat b { font: 800 32px var(--font-display); line-height: 1; }
+.big { font: 800 26px var(--font-display); }
+.tabs { display: flex; align-items: center; gap: 18px; border-bottom: 1px solid var(--line); margin-bottom: 8px; font-size: 13px; }
+.dash-tab { background: none; border: 0; padding: 0 0 10px; }
+.table-scroll { overflow-x: auto; }
+.tasks-table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+.tasks-table th { padding: 8px 6px; font-size: 12px; font-weight: 600; color: var(--muted); }
+.tasks-table td { padding: 11px 6px; border-top: 1px solid var(--line); }
+.tasks-table tbody tr { transition: background .2s; }
+.tasks-table tbody tr:hover { background: #ffffff40; }
+.empty { text-align: center; color: var(--muted); padding: 22px; }
+.two-col { display: grid; grid-template-columns: 1.1fr 1fr; gap: 18px; }
+.two-col > .card:first-child { border-radius: 8px var(--radius) var(--radius) var(--radius); }
+.ridge { position: relative; }
+.ridge svg { width: 100%; height: auto; display: block; overflow: visible; }
+.ridge-tip { position: absolute; pointer-events: none; opacity: 0; transform: translate(-50%, -130%); padding: 3px 9px; border-radius: 10px; background: var(--ink); color: var(--bg2); font-size: 12px; font-weight: 600; white-space: nowrap; transition: opacity .15s; }
+.lounge, .alert { display: flex; align-items: center; gap: 10px; padding: 12px; margin-top: 12px; border-radius: 16px; background: #ffffff40; border: 1px solid var(--line); font-size: 13px; }
+.alert { margin-top: 0; }
+.alert.warn { border-color: #f2a93b88; }
+
+/* right rail */
+.checkin { display: flex; flex-direction: column; gap: 10px; border-radius: 8px var(--radius) var(--radius) var(--radius); }
+.timer { display: flex; align-items: baseline; gap: 8px; }
+.timer span { font: 800 40px var(--font-display); font-variant-numeric: tabular-nums; }
+.cal-head, .cal-days { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; }
+.cal-head { font-size: 11px; color: var(--muted); margin-bottom: 4px; }
+.cal-days { font-size: 13px; }
+.next-event { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
+.meeting { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 16px; background: #ffffff40; border: 1px solid var(--line); font-size: 13px; }
+
+/* ---------- 7. MODAL & FORM ---------- */
+.modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: #0006; }
+.modal-box { width: min(440px, 92vw); padding: 22px; border-radius: 22px; background: var(--bg2); color: var(--ink); box-shadow: 0 30px 80px #0006; }
+.form { display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
+.form label { display: flex; flex-direction: column; gap: 4px; font-weight: 500; }
+.form input, .form select, .form textarea { padding: 9px 12px; border-radius: 12px; border: 1px solid var(--line); background: #ffffffb0; color: #10372c; }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.form-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ---------- 8. RESPONSIVE ---------- */
+@media (max-width: 1200px) { .rail { display: none; } }
+@media (max-width: 860px) {
+  .app { flex-direction: column; height: auto; }
+  .sidebar { width: 100%; }
+  .stats { grid-template-columns: 1fr 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* ---------- 9. COMPATIBILITY: HTML that your JS files render with Tailwind classes ---------- */
+/* Text follows the theme, so rows stay readable at night */
+#dashboardTasksBody, #noticesFeed, #upcomingMeetingsList, #miniCalDays { color: var(--ink); }
+#dashboardTasksBody .text-gray-900, #dashboardTasksBody .text-gray-800,
+#noticesFeed .text-gray-800, #miniCalDays .text-gray-700 { color: var(--ink); }
+#dashboardTasksBody .text-gray-400, #dashboardTasksBody .text-gray-500, #dashboardTasksBody .text-gray-600,
+#noticesFeed .text-gray-400 { color: var(--muted); }
+#noticesFeed .bg-\[\#F6F8F7\] { background: #ffffff40; border: 1px solid var(--line); margin-bottom: 8px; }
+.dash-tab.border-b-2 { border-color: var(--accent) !important; }
+
+/* Pages opened from the sidebar (Admin, Attendance, Profile, Settings, Tasks) */
+#section-dynamic { display: flex; flex-direction: column; gap: 20px; }
+#section-dynamic h1 { color: var(--ink) !important; font-family: var(--font-display); }
+#section-dynamic h1 ~ p { color: var(--muted) !important; }
+
+/* ---------- 10. AUTO-SYNC DYNAMIC PAGES WITH DAYLIGHT THEME ---------- */
+/* Converts solid white cards inside #section-dynamic to Daylight glass */
+#section-dynamic .bg-white {
+  background: var(--glass) !important;
+  backdrop-filter: blur(14px);
+  border-color: var(--line) !important;
+}
+
+/* Converts subtle light gray boxes (#F6F8F7, #EEF4F0) to translucent glass */
+#section-dynamic .bg-\[\#F6F8F7\],
+#section-dynamic .bg-\[\#EEF4F0\],
+#section-dynamic .bg-\[\#F2F8F5\] {
+  background: #ffffff40 !important;
+  border-color: var(--line) !important;
+}
+
+/* Converts hardcoded green primary buttons (#1E6B52) to dynamic time-of-day accent */
+#section-dynamic button.bg-\[\#1E6B52\],
+#section-dynamic .bg-\[\#1E6B52\].text-white {
+  background: var(--accent) !important;
+  color: var(--accent-ink) !important;
+}
+
+/* Syncs text & table borders inside dynamic pages with Daylight theme */
+#section-dynamic .text-gray-900,
+#section-dynamic .text-gray-800 {
+  color: var(--ink) !important;
+}
+#section-dynamic .text-gray-500,
+#section-dynamic .text-gray-400 {
+  color: var(--muted) !important;
+}
+#section-dynamic .border-\[\#E6ECE8\],
+#section-dynamic .border-\[\#F0F4F2\],
+#section-dynamic .divide-\[\#F0F4F2\] > :not([hidden]) ~ :not([hidden]) {
+  border-color: var(--line) !important;
+}
+
+/* ---------- 11. NIGHT MODE CONTRAST FIX (Inputs, Labels & Tabs) ---------- */
+/* Make form inputs translucent glass so --ink text is always readable */
+#section-dynamic input:not([type="checkbox"]),
+#section-dynamic select,
+#section-dynamic textarea {
+  background: #ffffff22 !important;
+  color: var(--ink) !important;
+  border-color: var(--line) !important;
+}
+
+#section-dynamic input::placeholder,
+#section-dynamic textarea::placeholder {
+  color: var(--muted) !important;
+}
+
+/* Fix labels & tabs that used dark Tailwind grays (text-gray-700, text-gray-900) */
+.dash-tab.text-gray-900,
+#section-dynamic label,
+#section-dynamic .text-gray-700,
+#section-dynamic .text-gray-600 {
+  color: var(--ink) !important;
+}
+
+.dash-tab.text-gray-400 {
+  color: var(--muted) !important;
+}
+
+/* Fix hardcoded green text/badges in dark mode to use dynamic accent */
+#section-dynamic .text-\[\#1E6B52\] {
+  color: var(--accent) !important;
+}

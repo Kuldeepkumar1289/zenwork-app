@@ -1,198 +1,225 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Zenwork — Sign In & Register</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body { font-family: 'Inter', sans-serif; background-color: #F6F8F7; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Zenwork — Sign In & Register</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/daylight.css">
+  <style>
+    .login-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 1.1fr 0.9fr;
+      gap: 48px;
+      padding: 36px 56px;
+      align-items: center;
+      max-width: 1240px;
+      margin: 0 auto;
+    }
+    .auth-card {
+      padding: 36px 38px;
+      border-radius: 28px 28px 28px 8px;
+      box-shadow: 0 24px 60px rgba(16, 55, 44, 0.08);
+    }
+    .day-input {
+      width: 100%;
+      padding: 11px 14px;
+      border-radius: 14px;
+      border: 1px solid var(--line);
+      background: #ffffff59;
+      color: var(--ink);
+      font-size: 14px;
+      transition: border-color 0.2s, background 0.2s;
+    }
+    .day-input::placeholder { color: var(--muted); }
+    .day-input:focus {
+      outline: none;
+      border-color: var(--accent);
+      background: #ffffff85;
+    }
+    .feature-card {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 16px 18px;
+      border-radius: 20px 20px 20px 6px;
+      background: var(--glass);
+      border: 1px solid var(--line);
+      backdrop-filter: blur(12px);
+      font-size: 13px;
+    }
+    @media (max-width: 960px) {
+      .login-shell { grid-template-columns: 1fr; padding: 24px; gap: 28px; }
+    }
+  </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-4">
+<body>
 
-    <div class="w-full max-w-md bg-white rounded-2xl border border-[#E6ECE8] shadow-sm p-8">
-        <!-- Brand Header -->
-        <div class="flex items-center gap-2.5 mb-6">
-            <div class="w-8 h-8 rounded-lg bg-[#1E6B52] flex items-center justify-center text-white font-bold text-lg">z</div>
-            <span class="text-xl font-semibold text-gray-900 tracking-tight">zenwork</span>
+  <div class="login-shell">
+
+    <!-- =========================================================
+         LEFT STAGE: Clean Brand Narrative & Workspace Highlights
+    ========================================================== -->
+    <section class="flex flex-col justify-center gap-8">
+      
+      <!-- Top Brand Row -->
+      <div class="flex items-center gap-3">
+        <div class="brand" style="padding: 0;">
+          <span class="brand-mark">z</span> zenwork
         </div>
+        <span class="chip">ACME Studio • Workspace</span>
+      </div>
 
-        <p class="text-xs font-semibold uppercase tracking-wider text-[#1E6B52] mb-1">Your work, in harmony</p>
-        <h1 id="formHeading" class="text-2xl font-semibold text-gray-900 mb-2">Welcome back</h1>
-        <p id="formSubheading" class="text-sm text-gray-500 mb-6">Sign in to access your tasks, attendance, and team workspace.</p>
+      <!-- Hero Copy -->
+      <div class="space-y-3.5">
+        <p class="kicker">Your work, in harmony</p>
+        <h1 style="font-size: clamp(36px, 4.2vw, 56px); font-weight: 800; line-height: 1.06;">
+          A calmer way to run your workday.
+        </h1>
+        <p class="muted" style="font-size: 15px; line-height: 1.6; max-width: 500px;">
+          Tasks, live attendance shifts, inter-department queries, and team voice lounges — all synced in one daylight workspace.
+        </p>
+      </div>
 
-        <!-- Alert Box -->
-        <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
-
-        <!-- SIGN IN FORM -->
-        <form id="loginForm" class="space-y-4">
-            <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1.5">Work Email</label>
-                <input type="email" id="loginEmail" required placeholder="kuldeep@zenwork.com"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1.5">Password</label>
-                <input type="password" id="loginPassword" required placeholder="••••••••"
-                    class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-            </div>
-
-            <button type="submit" id="loginSubmitBtn"
-                class="w-full py-2.5 px-4 bg-[#1E6B52] hover:bg-[#15523E] text-white font-medium text-sm rounded-xl transition cursor-pointer">
-                Sign in to workspace
-            </button>
-        </form>
-
-        <!-- SIGN UP (REGISTER) FORM -->
-        <form id="registerForm" class="hidden space-y-3.5">
-            <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
-                <input type="text" id="regName" required placeholder="Alex Morgan"
-                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Work Email</label>
-                <input type="email" id="regEmail" required placeholder="alex@zenwork.com"
-                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-            </div>
-
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Designation</label>
-                    <input type="text" id="regDesignation" required placeholder="Product Designer"
-                        class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-                </div>
-                <div>
-                    <label class="block text-xs font-medium text-gray-700 mb-1">Role Tier</label>
-                    <select id="regRole" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-                        <option value="MEMBER">Member</option>
-                        <option value="MANAGER">Manager</option>
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-xs font-medium text-gray-700 mb-1">Password</label>
-                <input type="password" id="regPassword" required placeholder="Min 6 characters"
-                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
-            </div>
-
-            <button type="submit" id="regSubmitBtn"
-                class="w-full py-2.5 px-4 bg-[#1E6B52] hover:bg-[#15523E] text-white font-medium text-sm rounded-xl transition cursor-pointer">
-                Create account
-            </button>
-        </form>
-
-        <!-- Toggle Link -->
-        <div class="mt-6 pt-5 border-t border-gray-100 text-center">
-            <p id="toggleText" class="text-xs text-gray-600">
-                Don't have an account? 
-                <button type="button" onclick="toggleAuthMode('register')" class="text-[#1E6B52] font-semibold hover:underline">Sign up</button>
-            </p>
+      <!-- Structured 3-Card Feature Grid -->
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
+        <div class="feature-card">
+          <span class="text-base">☑</span>
+          <div>
+            <b class="block text-xs">Smart Tasks</b>
+            <small class="mt-0.5">Blockers & deadlines</small>
+          </div>
         </div>
-    </div>
+        <div class="feature-card">
+          <span class="text-base">🕒</span>
+          <div>
+            <b class="block text-xs">Live Shifts</b>
+            <small class="mt-0.5">Punch-in & WFH queue</small>
+          </div>
+        </div>
+        <div class="feature-card">
+          <span class="text-base">🎙️</span>
+          <div>
+            <b class="block text-xs">Voice Rooms</b>
+            <small class="mt-0.5">Instant team sync</small>
+          </div>
+        </div>
+      </div>
 
-    <script src="js/api.js"></script>
-    <script>
-        if (getAuthToken()) {
-            window.location.href = "index.html";
-        }
+    </section>
 
-        function showAlert(msg, isError = true) {
-            const box = document.getElementById("alertBox");
-            box.textContent = msg;
-            box.className = isError
-                ? "mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700"
-                : "mb-4 p-3 rounded-lg bg-[#E6F4EA] border border-[#1E6B52]/20 text-xs text-[#1E6B52]";
-            box.classList.remove("hidden");
-        }
+    <!-- =========================================================
+         RIGHT STAGE: Glassmorphic Sign In / Register / Reset Card
+    ========================================================== -->
+    <section class="glass auth-card w-full max-w-md mx-auto">
 
-        function toggleAuthMode(mode) {
-            document.getElementById("alertBox").classList.add("hidden");
-            const loginForm = document.getElementById("loginForm");
-            const registerForm = document.getElementById("registerForm");
-            const heading = document.getElementById("formHeading");
-            const sub = document.getElementById("formSubheading");
-            const toggleText = document.getElementById("toggleText");
+      <div class="flex items-center justify-between mb-5">
+        <span class="chip">Workspace Access</span>
+        <span id="loginGreetingBadge" class="text-xs font-semibold muted">Welcome</span>
+      </div>
 
-            if (mode === "register") {
-                loginForm.classList.add("hidden");
-                registerForm.classList.remove("hidden");
-                heading.textContent = "Create your account";
-                sub.textContent = "Join your company workspace on Zenwork.";
-                toggleText.innerHTML = `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="text-[#1E6B52] font-semibold hover:underline">Sign in</button>`;
-            } else {
-                registerForm.classList.add("hidden");
-                loginForm.classList.remove("hidden");
-                heading.textContent = "Welcome back";
-                sub.textContent = "Sign in to access your tasks, attendance, and team workspace.";
-                toggleText.innerHTML = `Don't have an account? <button type="button" onclick="toggleAuthMode('register')" class="text-[#1E6B52] font-semibold hover:underline">Sign up</button>`;
-            }
-        }
+      <h2 id="formHeading" style="font-size: 28px; font-weight: 800; margin-bottom: 6px;">Welcome back</h2>
+      <p id="formSubheading" class="muted" style="font-size: 13px; margin-bottom: 22px;">
+        Sign in to access your tasks, attendance, and team workspace.
+      </p>
 
-        // Handle Sign In
-        document.getElementById("loginForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById("loginSubmitBtn");
-            btn.disabled = true;
-            btn.textContent = "Signing in...";
+      <div id="alertBox" class="hidden mb-4 p-3 rounded-xl text-xs font-medium"></div>
 
-            try {
-                const formData = new URLSearchParams();
-                formData.append("username", document.getElementById("loginEmail").value);
-                formData.append("password", document.getElementById("loginPassword").value);
+      <!-- 1. SIGN IN FORM -->
+      <form id="loginForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-semibold mb-1.5">Work Email</label>
+          <input type="email" id="loginEmail" required placeholder="kuldeep@zenwork.com" class="day-input">
+        </div>
+        <div>
+          <div class="flex items-center justify-between mb-1.5">
+            <label class="block text-xs font-semibold">Password</label>
+            <button type="button" onclick="toggleForgotPanel(true)" class="link" style="padding: 0;">
+              Forgot password?
+            </button>
+          </div>
+          <div class="relative">
+            <input type="password" id="loginPassword" required placeholder="••••••••" class="day-input" style="padding-right: 54px;">
+            <button type="button" onclick="togglePassVisibility('loginPassword', this)"
+              class="absolute right-3 top-2.5 text-xs font-semibold muted hover:opacity-100">
+              Show
+            </button>
+          </div>
+        </div>
+        <button type="submit" id="loginSubmitBtn" class="btn btn-primary wide" style="padding: 12px; font-size: 14px; margin-top: 6px;">
+          Sign in to workspace →
+        </button>
+      </form>
 
-                const response = await fetch(`${API_BASE_URL}/users/login`, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
-                    body: formData
-                });
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.detail || "Invalid email or password");
+      <!-- 2. INLINE FORGOT PASSWORD FORM -->
+      <form id="forgotForm" class="hidden space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold mb-1.5">Registered Work Email</label>
+          <input type="email" id="forgotEmail" required placeholder="kuldeep@zenwork.com" class="day-input">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1.5">New Password (min 6 chars)</label>
+          <input type="password" id="forgotNewPassword" required minlength="6" placeholder="••••••••" class="day-input">
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="toggleForgotPanel(false)" class="btn btn-ghost" style="width: 35%;">
+            Back
+          </button>
+          <button type="submit" id="forgotSubmitBtn" class="btn btn-primary" style="width: 65%;">
+            Reset password
+          </button>
+        </div>
+      </form>
 
-                setAuthToken(data.access_token);
-                const profile = await apiRequest("/users/me");
-                localStorage.setItem("zenwork_user", JSON.stringify(profile));
-                window.location.href = "index.html";
-            } catch (err) {
-                showAlert(err.message, true);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = "Sign in to workspace";
-            }
-        });
+      <!-- 3. SIGN UP FORM -->
+      <form id="registerForm" class="hidden space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold mb-1">Full Name</label>
+          <input type="text" id="regName" required placeholder="Alex Morgan" class="day-input">
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">Work Email</label>
+          <input type="email" id="regEmail" required placeholder="alex@zenwork.com" class="day-input">
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Designation</label>
+            <input type="text" id="regDesignation" required placeholder="Product Designer" class="day-input">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Role Tier</label>
+            <select id="regRole" class="day-input">
+              <option value="MEMBER">Member</option>
+              <option value="MANAGER">Manager</option>
+            </select>
+          </div>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">Password</label>
+          <input type="password" id="regPassword" required minlength="6" placeholder="Min 6 characters" class="day-input">
+        </div>
+        <button type="submit" id="regSubmitBtn" class="btn btn-primary wide" style="padding: 12px; font-size: 14px;">
+          Create account
+        </button>
+      </form>
 
-        // Handle Sign Up
-        document.getElementById("registerForm").addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const btn = document.getElementById("regSubmitBtn");
-            btn.disabled = true;
-            btn.textContent = "Creating account...";
+      <!-- Footer Toggle -->
+      <div class="mt-6 pt-5 border-t text-center" style="border-color: var(--line);">
+        <p id="toggleText" class="text-xs muted">
+          Don't have an account?
+          <button type="button" onclick="toggleAuthMode('register')" class="link">Sign up</button>
+        </p>
+      </div>
 
-            try {
-                const payload = {
-                    full_name: document.getElementById("regName").value,
-                    email: document.getElementById("regEmail").value,
-                    designation: document.getElementById("regDesignation").value,
-                    role_tier: document.getElementById("regRole").value,
-                    password: document.getElementById("regPassword").value
-                };
+    </section>
 
-                await apiRequest("/users/register", "POST", payload);
-                showAlert("Account created successfully! Please sign in now.", false);
-                document.getElementById("registerForm").reset();
-                setTimeout(() => toggleAuthMode("login"), 1200);
-            } catch (err) {
-                showAlert(err.message, true);
-            } finally {
-                btn.disabled = false;
-                btn.textContent = "Create account";
-            }
-        });
-    </script>
+  </div>
+
+  <!-- Applies real-time Daylight colors automatically without sky arc -->
+  <script src="js/theme.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/login.js"></script>
 </body>
 </html>

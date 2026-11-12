@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Zenwork — Sign In & Register</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body { font-family: 'Inter', sans-serif; background-color: #F6F8F7; }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white rounded-2xl border border-[#E6ECE8] shadow-sm p-8">
+        <!-- Brand Header -->
+        <div class="flex items-center gap-2.5 mb-6">
+            <div class="w-8 h-8 rounded-lg bg-[#1E6B52] flex items-center justify-center text-white font-bold text-lg">z</div>
+            <span class="text-xl font-semibold text-gray-900 tracking-tight">zenwork</span>
+        </div>
+
+        <p class="text-xs font-semibold uppercase tracking-wider text-[#1E6B52] mb-1">Your work, in harmony</p>
+        <h1 id="formHeading" class="text-2xl font-semibold text-gray-900 mb-2">Welcome back</h1>
+        <p id="formSubheading" class="text-sm text-gray-500 mb-6">Sign in to access your tasks, attendance, and team workspace.</p>
+
+        <!-- Alert Box -->
+        <div id="alertBox" class="hidden mb-4 p-3 rounded-lg text-sm"></div>
+
+        <!-- SIGN IN FORM -->
+        <form id="loginForm" class="space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">Work Email</label>
+                <input type="email" id="loginEmail" required placeholder="kuldeep@zenwork.com"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">Password</label>
+                <input type="password" id="loginPassword" required placeholder="••••••••"
+                    class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+            </div>
+
+            <button type="submit" id="loginSubmitBtn"
+                class="w-full py-2.5 px-4 bg-[#1E6B52] hover:bg-[#15523E] text-white font-medium text-sm rounded-xl transition cursor-pointer">
+                Sign in to workspace
+            </button>
+        </form>
+
+        <!-- SIGN UP (REGISTER) FORM -->
+        <form id="registerForm" class="hidden space-y-3.5">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Full Name</label>
+                <input type="text" id="regName" required placeholder="Alex Morgan"
+                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Work Email</label>
+                <input type="email" id="regEmail" required placeholder="alex@zenwork.com"
+                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Designation</label>
+                    <input type="text" id="regDesignation" required placeholder="Product Designer"
+                        class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+                </div>
+                <div>
+                    <label class="block text-xs font-medium text-gray-700 mb-1">Role Tier</label>
+                    <select id="regRole" class="w-full px-3 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+                        <option value="MEMBER">Member</option>
+                        <option value="MANAGER">Manager</option>
+                    </select>
+                </div>
+            </div>
+
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" id="regPassword" required placeholder="Min 6 characters"
+                    class="w-full px-3.5 py-2 rounded-xl border border-gray-200 text-sm focus:outline-none focus:border-[#1E6B52]">
+            </div>
+
+            <button type="submit" id="regSubmitBtn"
+                class="w-full py-2.5 px-4 bg-[#1E6B52] hover:bg-[#15523E] text-white font-medium text-sm rounded-xl transition cursor-pointer">
+                Create account
+            </button>
+        </form>
+
+        <!-- Toggle Link -->
+        <div class="mt-6 pt-5 border-t border-gray-100 text-center">
+            <p id="toggleText" class="text-xs text-gray-600">
+                Don't have an account? 
+                <button type="button" onclick="toggleAuthMode('register')" class="text-[#1E6B52] font-semibold hover:underline">Sign up</button>
+            </p>
+        </div>
+    </div>
+
+    <script src="js/api.js"></script>
+    <script>
+        if (getAuthToken()) {
+            window.location.href = "index.html";
+        }
+
+        function showAlert(msg, isError = true) {
+            const box = document.getElementById("alertBox");
+            box.textContent = msg;
+            box.className = isError
+                ? "mb-4 p-3 rounded-lg bg-red-50 border border-red-200 text-xs text-red-700"
+                : "mb-4 p-3 rounded-lg bg-[#E6F4EA] border border-[#1E6B52]/20 text-xs text-[#1E6B52]";
+            box.classList.remove("hidden");
+        }
+
+        function toggleAuthMode(mode) {
+            document.getElementById("alertBox").classList.add("hidden");
+            const loginForm = document.getElementById("loginForm");
+            const registerForm = document.getElementById("registerForm");
+            const heading = document.getElementById("formHeading");
+            const sub = document.getElementById("formSubheading");
+            const toggleText = document.getElementById("toggleText");
+
+            if (mode === "register") {
+                loginForm.classList.add("hidden");
+                registerForm.classList.remove("hidden");
+                heading.textContent = "Create your account";
+                sub.textContent = "Join your company workspace on Zenwork.";
+                toggleText.innerHTML = `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="text-[#1E6B52] font-semibold hover:underline">Sign in</button>`;
+            } else {
+                registerForm.classList.add("hidden");
+                loginForm.classList.remove("hidden");
+                heading.textContent = "Welcome back";
+                sub.textContent = "Sign in to access your tasks, attendance, and team workspace.";
+                toggleText.innerHTML = `Don't have an account? <button type="button" onclick="toggleAuthMode('register')" class="text-[#1E6B52] font-semibold hover:underline">Sign up</button>`;
+            }
+        }
+
+        // Handle Sign In
+        document.getElementById("loginForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("loginSubmitBtn");
+            btn.disabled = true;
+            btn.textContent = "Signing in...";
+
+            try {
+                const formData = new URLSearchParams();
+                formData.append("username", document.getElementById("loginEmail").value);
+                formData.append("password", document.getElementById("loginPassword").value);
+
+                const response = await fetch(`${API_BASE_URL}/users/login`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+                    body: formData
+                });
+                const data = await response.json();
+                if (!response.ok) throw new Error(data.detail || "Invalid email or password");
+
+                setAuthToken(data.access_token);
+                const profile = await apiRequest("/users/me");
+                localStorage.setItem("zenwork_user", JSON.stringify(profile));
+                window.location.href = "index.html";
+            } catch (err) {
+                showAlert(err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Sign in to workspace";
+            }
+        });
+
+        // Handle Sign Up
+        document.getElementById("registerForm").addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const btn = document.getElementById("regSubmitBtn");
+            btn.disabled = true;
+            btn.textContent = "Creating account...";
+
+            try {
+                const payload = {
+                    full_name: document.getElementById("regName").value,
+                    email: document.getElementById("regEmail").value,
+                    designation: document.getElementById("regDesignation").value,
+                    role_tier: document.getElementById("regRole").value,
+                    password: document.getElementById("regPassword").value
+                };
+
+                await apiRequest("/users/register", "POST", payload);
+                showAlert("Account created successfully! Please sign in now.", false);
+                document.getElementById("registerForm").reset();
+                setTimeout(() => toggleAuthMode("login"), 1200);
+            } catch (err) {
+                showAlert(err.message, true);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = "Create account";
+            }
+        });
+    </script>
+</body>
+</html>

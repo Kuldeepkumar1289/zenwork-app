@@ -1,4 +1,3 @@
-# src/user/controller.py
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from src.user.models import User, RoleTier

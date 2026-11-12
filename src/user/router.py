@@ -1,19 +1,18 @@
-# src/user/router.py
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status,HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 from fastapi.security import OAuth2PasswordRequestForm  
 
 from src.utils.db import get_db
 from src.utils.dependencies import get_current_user
-from src.user.models import User
+from src.user.models import User, RoleTier
 
 from src.user.dtos import (
     UserRegister,
     UserLogin,
     UserResponse,
     TokenResponse,
-    OrgNodeResponse  # <-- Capital 'O'
+    OrgNodeResponse  
 )
 
 from src.user.controller import (
@@ -27,6 +26,11 @@ user_router = APIRouter(prefix="/users", tags=["Authentication & Hierarchy"])
 @user_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Register a new user")
 def register(data: UserRegister, db: Session = Depends(get_db)):  # <-- Session capital
     """Register a new user and return the user response."""
+    if data.role_tier == RoleTier.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin accounts cannot be created via public registration."
+        )
     new_user = register_user(data=data, db=db)
     return new_user
 

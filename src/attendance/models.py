@@ -23,3 +23,33 @@ class Attendance(Base):
     notes = Column(Text, nullable=True)
 
     user = relationship("User", foreign_keys=[user_id])
+
+class LeaveType(str, Enum):
+    CASUAL = "CASUAL"
+    SICK = "SICK"
+    WFH = "WFH"                  # Work From Home
+    EARNED = "EARNED"
+
+class LeaveRequestStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+class LeaveRequest(Base):
+    __tablename__ = "leave_requests"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    leave_type = Column(SqlEnum(LeaveType), nullable=False)
+    start_date = Column(Date, nullable=False)
+    end_date = Column(Date, nullable=False)
+    days_count = Column(Integer, default=1, nullable=False)
+    reason = Column(Text, nullable=False)
+    status = Column(SqlEnum(LeaveRequestStatus), default=LeaveRequestStatus.PENDING, nullable=False)
+    
+    reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
+    admin_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    applicant = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by_id])

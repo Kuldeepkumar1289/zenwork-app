@@ -1,9 +1,10 @@
 from datetime import datetime, date
 from typing import Optional, List
 from pydantic import BaseModel, ConfigDict
-from src.attendance.models import AttendanceStatus
+from src.attendance.models import AttendanceStatus, LeaveType, LeaveRequestStatus
 from src.user.dtos import UserResponse
 
+# --- Attendance DTOs ---
 class PunchInRequest(BaseModel):
     notes: Optional[str] = None
 
@@ -27,3 +28,31 @@ class TeamAttendanceReport(BaseModel):
     date: date
     total_checked_in: int
     records: List[AttendanceResponse]
+
+
+# --- Leaves & WFH DTOs ---
+class ApplyLeaveRequest(BaseModel):
+    leave_type: LeaveType
+    start_date: date
+    end_date: date
+    reason: str
+
+class ReviewLeaveRequest(BaseModel):
+    status: LeaveRequestStatus   # APPROVED or REJECTED
+    admin_notes: Optional[str] = None
+
+class LeaveRequestResponse(BaseModel):
+    id: int
+    user_id: int
+    leave_type: LeaveType
+    start_date: date
+    end_date: date
+    days_count: int
+    reason: str
+    status: LeaveRequestStatus
+    reviewed_by_id: Optional[int] = None
+    admin_notes: Optional[str] = None
+    created_at: datetime
+    applicant: Optional[UserResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)

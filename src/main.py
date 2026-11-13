@@ -15,6 +15,8 @@ from src.calendar_events.router import calendar_router
 from src.analytics.router import analytics_router
 from src.worker.scheduler import start_scheduler, stop_scheduler
 from src.admin.router import admin_router
+from src.events import models as event_models
+from src.events.router import router as events_router
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)
@@ -34,6 +36,7 @@ app = FastAPI(
 
 # Mount uploads directory for serving voice notes & task files
 os.makedirs("uploads", exist_ok=True)
+app.mount("/static/uploads", StaticFiles(directory="uploads"), name="static_uploads")
 app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 # Routers
@@ -46,6 +49,9 @@ app.include_router(calendar_router, prefix="/api/v1")
 app.include_router(analytics_router, prefix="/api/v1")
 app.include_router(upload_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
+app.include_router(events_router, prefix="/api/v1")
+
+
 
 # CORS Middleware
 app.add_middleware(

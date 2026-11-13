@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from enum import Enum
-from sqlalchemy import Column, Integer, DateTime, Date, Float, Enum as SqlEnum, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Float, Text, Date, DateTime, ForeignKey, Enum as SqlEnum
 from sqlalchemy.orm import relationship
 from src.utils.db import Base
 
@@ -49,6 +49,28 @@ class LeaveRequest(Base):
     
     reviewed_by_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     admin_notes = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    applicant = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by_id])
+
+class RegularizationStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+class AttendanceRegularization(Base):
+    __tablename__ = "attendance_regularizations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    target_date = Column(Date, nullable=False)
+    requested_punch_in = Column(DateTime, nullable=False)
+    requested_punch_out = Column(DateTime, nullable=True)  # None = still working today
+    reason = Column(String(500), nullable=False)
+    status = Column(SqlEnum(RegularizationStatus), default=RegularizationStatus.PENDING, nullable=False)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    admin_notes = Column(String(255), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     applicant = relationship("User", foreign_keys=[user_id])

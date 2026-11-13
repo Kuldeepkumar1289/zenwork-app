@@ -1,13 +1,9 @@
-// =============================================================
-// GLOBAL STATE VARIABLES (Data stored in memory for fast UI)
-// =============================================================
+
 let currentUser = null;
 let allTasks = [];
 let todayAttendance = null;
 
-// =============================================================
 // 1. APP STARTUP: Runs automatically when index.html opens
-// =============================================================
 document.addEventListener("DOMContentLoaded", async () => {
     // Check if user is logged in; if not, go to login page
     if (!getAuthToken()) {
@@ -39,11 +35,15 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 // Sets current date in top-right badge (e.g., "Thu, 12 November 2026")
 function setTodayDate() {
-    const now = new Date();
-    const formatted = now.toLocaleDateString('en-US', {
-        weekday: 'short', day: 'numeric', month: 'long', year: 'numeric'
-    });
-    document.getElementById("headerDate").textContent = formatted;
+    const dateEl = document.getElementById("heroDate") || document.getElementById("headerDate");
+    if (dateEl) {
+        dateEl.textContent = new Date().toLocaleDateString("en-US", {
+            weekday: "short",
+            month: "long",
+            day: "numeric",
+            year: "numeric"
+        });
+    }
 }
 
 // Updates user name, designation, and shows Admin tab if user is ADMIN
@@ -51,7 +51,10 @@ function updateProfileUI(user) {
     const firstName = user.full_name.split(" ")[0];
     const hr = new Date().getHours();
     const hello = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : hr < 20 ? "Good evening" : "Good night";
-    document.getElementById("greetingText").textContent = `${hello}, ${firstName}`;
+
+    const greetEl = document.getElementById("heroGreeting") || document.getElementById("greetingText");
+    if (greetEl) greetEl.textContent = `${hello}, ${firstName}`;
+
     document.getElementById("topUserName").textContent = user.full_name;
     document.getElementById("topUserRole").textContent = user.designation;
     document.getElementById("topAvatar").textContent = firstName[0].toUpperCase();
@@ -61,9 +64,7 @@ function updateProfileUI(user) {
     }
 }
 
-// =============================================================
 // 2. TASKS TABLE & FILTERING
-// =============================================================
 async function loadTasks() {
     try {
         const response = await apiRequest("/tasks/");
@@ -142,9 +143,13 @@ function filterDashboardTasks(status, clickedBtn) {
     document.querySelectorAll(".dash-tab").forEach(tab => {
         tab.classList.remove("font-semibold", "text-gray-900", "border-b-2", "border-[#1E6B52]");
         tab.classList.add("font-medium", "text-gray-400");
+        tab.style.borderColor = "transparent";
+        tab.style.color = "";
     });
-    clickedBtn.classList.add("font-semibold", "text-gray-900", "border-b-2", "border-[#1E6B52]");
+    clickedBtn.classList.add("font-semibold", "border-b-2");
     clickedBtn.classList.remove("font-medium", "text-gray-400");
+    clickedBtn.style.borderColor = "var(--accent)";
+    clickedBtn.style.color = "var(--accent)";
 
     if (status === "ALL") {
         renderTasksTable(allTasks);
@@ -169,9 +174,9 @@ async function markTaskDone(taskId) {
     }
 }
 
-// =============================================================
+
 // 3. ATTENDANCE & SHIFT TIMER (Right Utility Panel)
-// =============================================================
+
 let shiftTimerInterval = null;
 
 async function loadTodayAttendance() {
@@ -199,11 +204,14 @@ async function loadTodayAttendance() {
             const updateClock = () => {
                 const diffMs = Math.max(0, Date.now() - punchIn.getTime());
                 const totalMins = Math.floor(diffMs / 60000);
-                const hh = String(Math.floor(totalMins / 60)).padStart(2, '0');
-                const mm = String(totalMins % 60).padStart(2, '0');
+                const hh = Math.floor(totalMins / 60);
+                const mm = totalMins % 60;
+                
+                // Live clock format: "5 min" ya "1h 15m"
+                const liveStr = hh > 0 ? `${hh}h ${mm}m` : `${mm} min`;
 
-                timerDisplay.textContent = `${hh}:${mm}`;
-                document.getElementById("statHours").textContent = `${hh}:${mm}`;
+                timerDisplay.textContent = liveStr;
+                document.getElementById("statHours").textContent = liveStr;
                 document.getElementById("statAttBadge").textContent = "Active";
             };
 
@@ -213,9 +221,12 @@ async function loadTodayAttendance() {
             btn.textContent = "Shift Completed";
             btn.disabled = true;
             btn.className = "btn wide opacity-60 cursor-not-allowed";
-            timerDisplay.textContent = `${todayAttendance.total_hours}h`;
+            
+            // Ye raha apka naya formatting logic:
+            const formattedTotal = formatDuration(todayAttendance.total_hours);
+            timerDisplay.textContent = formattedTotal;
             statusLabel.textContent = todayAttendance.status;
-            document.getElementById("statHours").textContent = `${todayAttendance.total_hours}h`;
+            document.getElementById("statHours").textContent = formattedTotal;
             document.getElementById("statAttBadge").textContent = todayAttendance.status;
         }
     } catch (e) {}
@@ -234,9 +245,7 @@ async function handlePunchToggle() {
     }
 }
 
-// =============================================================
 // 4. ANNOUNCEMENTS, PERFORMANCE & QUERIES COUNT
-// =============================================================
 async function loadAnnouncements() {
     const feed = document.getElementById("noticesFeed");
     try {
@@ -260,16 +269,28 @@ async function loadAnnouncements() {
         `).join("");
     } catch (e) {}
 }
-
 async function loadPerformanceStats() {
     try {
-        const perf = await apiRequest("/analytics/me");
-        if (perf && perf.overall_score !== undefined) {
-            const score = Math.round(perf.overall_score);
-            document.getElementById("statPerformance").textContent = `${score}%`;
-            document.getElementById("analyticsBigScore").textContent = `${score}%`;
-        }
-    } catch (e) {}
+        const perf = await apiRequest("/analytics/scorecard");
+        if (!perf) return;
+
+        const rate = Math.round(perf.on_time_delivery_rate ?? 0);
+        const hoursLogged = Number(perf.total_hours_logged || 0);
+        const blockers = Number(perf.active_blockers_count || 0);
+
+        const attendanceBonus = hoursLogged > 0 ? Math.min(20, Math.round(hoursLogged * 2.5)) : 10;
+        const score = (perf.total_assigned > 0 || hoursLogged > 0)
+            ? Math.max(0, Math.min(100, Math.round((rate * 0.8) + attendanceBonus - (blockers * 5))))
+            : 0;
+
+        const statEl = document.getElementById("statPerformance");
+        if (statEl) statEl.textContent = `${rate}%`;
+
+        const bigScoreEl = document.getElementById("analyticsBigScore");
+        if (bigScoreEl) bigScoreEl.textContent = `${score}%`;
+    } catch (e) {
+        console.warn("Scorecard error:", e.message);
+    }
 }
 
 async function loadOpenQueriesCount() {
@@ -289,9 +310,7 @@ async function loadOpenQueriesCount() {
     } catch (e) {}
 }
 
-// =============================================================
 // 5. MINI CALENDAR & TASK CREATE MODAL
-// =============================================================
 function drawMiniCalendar() {
     const now = new Date();
     const totalDays = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
@@ -340,9 +359,7 @@ document.getElementById("createTaskForm").addEventListener("submit", async (e) =
     }
 });
 
-// =============================================================
 // 6. SIDEBAR NAVIGATION ROUTER (Switches between tabs)
-// =============================================================
 function switchSection(sectionName) {
     // Highlight selected sidebar button
     document.querySelectorAll(".nav-item").forEach(btn => {
@@ -384,6 +401,11 @@ function switchSection(sectionName) {
         dynView.classList.remove("hidden");
         renderSettingsSection();
 
+    } else if (typeof SECTION_RENDERERS !== "undefined" && SECTION_RENDERERS[sectionName]) {
+        dashView.classList.add("hidden");
+        dynView.classList.remove("hidden");
+        SECTION_RENDERERS[sectionName]();
+
     } else {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
@@ -393,4 +415,130 @@ function switchSection(sectionName) {
                 <p class="text-xs text-gray-500 mt-1">Ready for Step 2 module connection.</p>
             </div>`;
     }
+}
+
+
+document.addEventListener("DOMContentLoaded", () => {
+  const helpBtn = document.querySelector('.topbar-right button[title="Help"]');
+  const notifBtn = document.querySelector('.topbar-right button[title="Notifications"]');
+
+  function closeHeaderPopovers() {
+    document.getElementById("zenPopover")?.remove();
+  }
+
+  function showHeaderPopover(anchorEl, key, title, bodyHtml) {
+    const existing = document.getElementById("zenPopover");
+    if (existing && existing.dataset.owner === key) {
+      existing.remove();
+      return;
+    }
+    closeHeaderPopovers();
+
+    const rect = anchorEl.getBoundingClientRect();
+    const box = document.createElement("div");
+    box.id = "zenPopover";
+    box.dataset.owner = key;
+    box.style.cssText = `
+      position: fixed;
+      top: ${rect.bottom + 10}px;
+      right: ${Math.max(16, window.innerWidth - rect.right)}px;
+      width: 315px;
+      background: #FFFFFF;
+      border: 1px solid #E2E8F0;
+      border-radius: 16px;
+      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+      padding: 14px 16px;
+      z-index: 9999;
+      color: #0F172A;
+    `;
+    box.innerHTML = `
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <b style="font-size:13px;color:#0F172A;">${title}</b>
+        <button type="button" onclick="document.getElementById('zenPopover')?.remove()" style="font-size:13px;color:#64748B;cursor:pointer;">✕</button>
+      </div>
+      ${bodyHtml}
+    `;
+    document.body.appendChild(box);
+  }
+
+  if (notifBtn) {
+    notifBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      const dot = notifBtn.querySelector(".notif-dot");
+      if (dot) dot.style.display = "none";
+
+      const pendingTasks = (typeof allTasks !== "undefined" ? allTasks : []).filter(t => t.status !== "COMPLETED");
+      const openQ = document.getElementById("statQueries")?.textContent?.trim()
+        || document.getElementById("openQueriesCount")?.textContent?.trim()
+        || "0";
+
+      const unreadChats = typeof window.getUnreadChatSummaries === "function"
+        ? window.getUnreadChatSummaries()
+        : [];
+
+      const chatNotifRows = unreadChats.map(c => `
+        <div onclick="document.getElementById('zenPopover')?.remove(); switchSection('chats'); setTimeout(() => openChat('dm-${c.partnerId}'), 120);"
+          style="padding:8px 10px;border-radius:10px;background:#EEF2FF;border:1px solid #C7D2FE;margin-bottom:6px;font-size:12px;cursor:pointer;">
+          <div style="display:flex;justify-content:space-between;font-weight:700;color:#1E1B4B;">
+            <span>${c.title}</span>
+            <span style="font-size:10px;color:#4F46E5;">${c.time}</span>
+          </div>
+          <div style="color:#475569;font-size:11px;margin-top:2px;">${c.sub}</div>
+        </div>
+      `).join("");
+
+      const taskRows = pendingTasks.slice(0, 3).map(t => `
+        <div style="padding:8px 10px;border-radius:10px;background:#F8FAFC;margin-bottom:6px;font-size:12px;">
+          <div style="font-weight:600;color:#0F172A;">${t.title}</div>
+          <div style="color:#64748B;font-size:11px;">Status: ${t.status} • Priority: ${t.priority}</div>
+        </div>
+      `).join("");
+
+      showHeaderPopover(notifBtn, "notif", "Workspace Notifications", `
+        <div style="font-size:12px;color:#475569;margin-bottom:8px;line-height:1.5;">
+          • <b>${unreadChats.length}</b> unread chat alert(s)<br>
+          • <b>${pendingTasks.length}</b> active task(s) in your queue<br>
+          • <b>${openQ}</b> open query awaiting response
+        </div>
+        ${chatNotifRows}
+        ${taskRows || (!chatNotifRows ? `<p style="font-size:12px;color:#94A3B8;margin:6px 0;">You're all caught up!</p>` : "")}
+        <button type="button" onclick="document.getElementById('zenPopover')?.remove(); switchSection('chats');"
+          style="margin-top:8px;width:100%;padding:8px;border-radius:10px;background:var(--accent);color:#FFFFFF;font-size:12px;font-weight:600;cursor:pointer;">
+          Open Chats
+        </button>
+      `);
+    });
+  }
+
+  if (helpBtn) {
+    helpBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      showHeaderPopover(helpBtn, "help", "Zenwork Quick Help", `
+        <div style="font-size:12px;color:#475569;line-height:1.65;">
+          <div><b>⌘K / Ctrl+K:</b> Jump to global search</div>
+          <div><b>Live Sky Arc:</b> Automatically synced with real-time clock across 12 day-to-night themes</div>
+          <div><b>Approvals:</b> Admins &amp; Managers can approve Leaves/WFH &amp; resolve Queries</div>
+        </div>
+        <button type="button" onclick="document.getElementById('zenPopover')?.remove(); switchSection('queries');"
+          style="margin-top:10px;width:100%;padding:8px;border-radius:10px;background:#F1F5F9;color:#0F172A;font-size:12px;font-weight:600;cursor:pointer;">
+          Raise a Support Query →
+        </button>
+      `);
+    });
+  }
+
+  document.addEventListener("click", (e) => {
+    const pop = document.getElementById("zenPopover");
+    if (pop && !pop.contains(e.target)) closeHeaderPopovers();
+  });
+});
+
+function formatDuration(totalHours) {
+    const totalMins = Math.round(Number(totalHours || 0) * 60);
+    if (totalMins < 1) return "0 min";
+    if (totalMins < 60) return `${totalMins} min`;
+    const hh = Math.floor(totalMins / 60);
+    const mm = totalMins % 60;
+    return mm === 0 ? `${hh}h` : `${hh}h ${mm}m`;
 }

@@ -56,3 +56,30 @@ class LeaveRequestResponse(BaseModel):
     applicant: Optional[UserResponse] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+from src.attendance.models import RegularizationStatus
+
+class RegularizationCreateRequest(BaseModel):
+    target_date: date
+    requested_punch_in: datetime
+    requested_punch_out: Optional[datetime] = None
+    reason: str
+
+class RegularizationReviewRequest(BaseModel):
+    status: RegularizationStatus  # APPROVED or REJECTED
+    admin_notes: Optional[str] = None
+
+class RegularizationResponse(BaseModel):
+    id: int
+    user_id: int
+    target_date: date
+    requested_punch_in: datetime
+    requested_punch_out: Optional[datetime] = None
+    reason: str
+    status: RegularizationStatus
+    reviewed_by_id: Optional[int] = None
+    admin_notes: Optional[str] = None
+    created_at: datetime
+    applicant: Optional[UserResponse] = None
+
+    model_config = ConfigDict(from_attributes=True)

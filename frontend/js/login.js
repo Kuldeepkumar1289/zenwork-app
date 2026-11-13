@@ -18,7 +18,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/* ---------- Helpers ---------- */
+/*  Helpers  */
 function showAlert(msg, isError = true) {
   const box = document.getElementById("alertBox");
   box.textContent = msg;
@@ -66,7 +66,7 @@ function toggleForgotPanel(showForgot) {
                : "Sign in to access your tasks, attendance, and team workspace.";
 }
 
-/* ---------- Sign In ---------- */
+/*  Sign In  */
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("loginSubmitBtn");
@@ -98,7 +98,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 
-/* ---------- Inline Forgot Password ---------- */
+/*  Inline Forgot Password  */
 document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("forgotSubmitBtn");
@@ -120,7 +120,7 @@ document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   }
 });
 
-/* ---------- Sign Up ---------- */
+/*  Sign Up  */
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("regSubmitBtn");

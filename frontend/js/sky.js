@@ -1,125 +1,108 @@
-/* =========================================================
-   sky.js — the sun/moon arc + the time-of-day slider
-   Public API:  DaylightSky.init()
-                DaylightSky.setHour(hour)
-                DaylightSky.setMarkers([{ label, hour, done }])
-                    -> shows tasks as dots on the arc (06:00–18:00)
-   ========================================================= */
-const DaylightSky = (() => {
+/* sky.js — Read-Only 24-Hour Sky Arc & Auto-Moving Sun
+   Manual clicking/dragging disabled; driven strictly by live time
+    */
+window.DaylightSky = (() => {
+  const X0 = 70, X1 = 1030, Y_BASE = 186, ARC_H = 148;
+  let currentHour = 12;
+  let taskMarkers = [];
 
-  // Drawing area (matches the viewBox in index.html)
-  const WIDTH = 1100, BASELINE = 190, ARC_HEIGHT = 150, MARGIN = 60;
-
-  let hour = 9;
-  let markers = [];
-  let dragging = false;
-
-  const el = id => document.getElementById(id);
-
-  /** Where the sun (06–18) or moon (18–06) sits for a given hour. */
-  function positionAt(h) {
-    const isSun = h >= 6 && h <= 18;
-    const progress = isSun ? (h - 6) / 12 : (h >= 18 ? h - 18 : h + 6) / 12;
-    return {
-      x: MARGIN + progress * (WIDTH - 2 * MARGIN),
-      y: BASELINE - Math.sin(Math.PI * progress) * ARC_HEIGHT,
-      isSun
-    };
+  function pointAt(hour) {
+    const t = Math.max(0, Math.min(24, hour)) / 24;
+    const x = X0 + (X1 - X0) * t;
+    const y = Y_BASE - Math.sin(t * Math.PI) * ARC_H;
+    return { x, y };
   }
 
-  /** Draw the static parts: dotted arc, horizon, hour labels, task dots. */
-  function draw() {
-    let svg = '';
+  function formatHourLabel(h) {
+    if (h === 0 || h === 24) return "12a";
+    if (h === 12) return "12p";
+    return h < 12 ? `${h}a` : `${h - 12}p`;
+  }
 
-    // dotted arc
-    let path = `M${MARGIN} ${BASELINE}`;
-    for (let i = 0; i <= 40; i++) {
-      const p = positionAt(6 + (i / 40) * 12);
-      path += ` L${p.x} ${p.y}`;
+  function render(hour = currentHour) {
+    currentHour = hour;
+    const svg = document.getElementById("sky");
+    if (!svg) return;
+
+    const palette = window.DaylightTheme
+      ? window.DaylightTheme.getPalette(currentHour)
+      : { isNight: false, accent: "#0284C7", sun1: "#FDE047", sun2: "#F59E0B" };
+
+    const isNight = palette.isNight;
+    const labelColor = isNight ? "rgba(255,255,255,0.85)" : "#475569";
+    const lineColor = isNight ? "rgba(255,255,255,0.22)" : "rgba(15,23,42,0.14)";
+    const dotColor = isNight ? "#93C5FD" : palette.accent;
+
+    let pathD = "";
+    for (let i = 0; i <= 48; i++) {
+      const p = pointAt((i / 48) * 24);
+      pathD += (i === 0 ? `M${p.x} ${p.y}` : ` L${p.x} ${p.y}`);
     }
-    svg += `<path d="${path}" fill="none" stroke="var(--line)" stroke-width="2" stroke-dasharray="3 8" stroke-linecap="round"/>`;
-    svg += `<line x1="20" y1="${BASELINE}" x2="${WIDTH - 20}" y2="${BASELINE}" stroke="var(--line)"/>`;
 
-    // hour labels
-    [6, 9, 12, 15, 18].forEach(h => {
-      const p = positionAt(h);
-      svg += `<text x="${p.x}" y="${BASELINE + 20}" text-anchor="middle">${DaylightTheme.formatHour(h).replace(':00', '')}</text>`;
-    });
+    const starsHtml = isNight ? `
+      <g fill="#FFFFFF" opacity="0.75">
+        <circle cx="190" cy="48" r="1.8"/><circle cx="320" cy="32" r="2.2"/>
+        <circle cx="460" cy="55" r="1.5"/><circle cx="640" cy="36" r="2"/>
+        <circle cx="790" cy="52" r="1.8"/><circle cx="910" cy="38" r="2.2"/>
+      </g>` : "";
 
-    // task markers
-    markers.forEach(m => {
-      if (m.hour < 6 || m.hour > 18) return;
-      const p = positionAt(m.hour);
-      svg += `<circle cx="${p.x}" cy="${p.y}" r="9" fill="${m.done ? 'var(--accent)' : 'var(--sun)'}" stroke="var(--bg2)" stroke-width="3"/>`;
-      svg += `<text x="${p.x}" y="${p.y - 16}" text-anchor="middle" style="fill:var(--ink);font-weight:600">${escapeHtml(m.label.slice(0, 18))}</text>`;
-    });
+    const stops = [0, 2, 4, 6, 8, 10, 12, 14, 16, 18, 20, 22, 24];
+    const ticksHtml = stops.map(h => {
+      const p = pointAt(h);
+      return `
+        <g style="pointer-events:none;user-select:none;">
+          <circle cx="${p.x}" cy="${p.y}" r="4.5" fill="${dotColor}" opacity="0.8"/>
+          <line x1="${p.x}" y1="${Y_BASE - 4}" x2="${p.x}" y2="${Y_BASE + 5}" stroke="${lineColor}" stroke-width="1.5"/>
+          <text x="${p.x}" y="${Y_BASE + 20}" text-anchor="middle" style="font-size:11px;font-weight:700;fill:${labelColor}">
+            ${formatHourLabel(h)}
+          </text>
+        </g>`;
+    }).join("");
 
-    // the draggable sun / moon
-    svg += `<g id="skyOrb" style="cursor:grab" tabindex="0" role="slider" aria-label="Time of day">
-              <circle id="skyHalo" r="26" opacity=".28"/><circle id="skyBody" r="14"/></g>`;
+    const markersHtml = taskMarkers.map(m => {
+      const p = pointAt(m.hour);
+      return `
+        <g>
+          <title>${m.label}</title>
+          <circle cx="${p.x}" cy="${p.y}" r="6.5" fill="${m.done ? "#22C55E" : palette.sun2}" stroke="#FFFFFF" stroke-width="2"/>
+        </g>`;
+    }).join("");
 
-    el('sky').innerHTML = svg;
-    placeOrb();
-  }
+    const orb = pointAt(currentHour);
 
-  function placeOrb() {
-    const orb = el('skyOrb');
-    if (!orb) return;
-    const p = positionAt(hour);
-    orb.setAttribute('transform', `translate(${p.x} ${p.y})`);
-    const colour = p.isSun ? 'var(--sun)' : '#e8f0ff';
-    el('skyBody').setAttribute('fill', colour);
-    el('skyHalo').setAttribute('fill', colour);
-  }
+    svg.style.cursor = "default";
+    svg.innerHTML = `
+      <defs>
+        <radialGradient id="sunHalo" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="${palette.sun1}" stop-opacity="0.85"/>
+          <stop offset="55%" stop-color="${palette.sun2}" stop-opacity="0.30"/>
+          <stop offset="100%" stop-color="${palette.sun2}" stop-opacity="0"/>
+        </radialGradient>
 
-  function setHour(h) {
-    hour = Math.max(0, Math.min(24, h));
-    el('timeSlider').value = hour;
-    el('timeOutput').textContent = DaylightTheme.formatHour(hour);
-    DaylightTheme.apply(hour);
-    placeOrb();
+        <linearGradient id="sunOrbGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="${palette.sun1}"/>
+          <stop offset="100%" stop-color="${palette.sun2}"/>
+        </linearGradient>
+      </defs>
+
+      ${starsHtml}
+      <line x1="${X0}" y1="${Y_BASE}" x2="${X1}" y2="${Y_BASE}" stroke="${lineColor}" stroke-width="1.5"/>
+      <path d="${pathD}" fill="none" stroke="${dotColor}" stroke-opacity="0.55" stroke-width="2.5" stroke-dasharray="5 6"/>
+
+      ${ticksHtml}
+      ${markersHtml}
+
+      <g style="pointer-events:none;">
+        <circle cx="${orb.x}" cy="${orb.y}" r="42" fill="url(#sunHalo)"/>
+        <circle cx="${orb.x}" cy="${orb.y}" r="14.5" fill="url(#sunOrbGrad)" stroke="#FFFFFF" stroke-width="3"/>
+      </g>
+    `;
   }
 
   function setMarkers(list) {
-    markers = list || [];
-    draw();
+    taskMarkers = Array.isArray(list) ? list : [];
+    render(currentHour);
   }
 
-  function escapeHtml(text) {
-    return text.replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  }
-
-  function hourFromPointer(event) {
-    const box = el('sky').getBoundingClientRect();
-    const x = (event.clientX - box.left) / box.width * WIDTH;
-    const progress = Math.max(0, Math.min(1, (x - MARGIN) / (WIDTH - 2 * MARGIN)));
-    return 6 + progress * 12;
-  }
-
-  function bindEvents() {
-    el('timeSlider').addEventListener('input', e => setHour(+e.target.value));
-    el('timeNow').addEventListener('click', () => {
-      const d = new Date();
-      setHour(d.getHours() + d.getMinutes() / 60);
-    });
-    el('sky').addEventListener('pointerdown', e => {
-      if (e.target.closest('#skyOrb')) { dragging = true; e.preventDefault(); }
-    });
-    window.addEventListener('pointermove', e => { if (dragging) setHour(hourFromPointer(e)); });
-    window.addEventListener('pointerup', () => { dragging = false; });
-    el('sky').addEventListener('keydown', e => {
-      if (e.key === 'ArrowRight') setHour(hour + 0.25);
-      if (e.key === 'ArrowLeft')  setHour(hour - 0.25);
-    });
-  }
-
-  function init() {
-    const d = new Date();
-    hour = d.getHours() + d.getMinutes() / 60;   // start at the real time
-    draw();
-    bindEvents();
-    setHour(hour);
-  }
-
-  return { init, setHour, setMarkers };
+  return { render, setMarkers };
 })();

@@ -1,15 +1,17 @@
 const API_BASE_URL = "http://127.0.0.1:8001/api/v1";
 
-// Token management
+// Per-tab Token management (keeps each browser tab's login session separate)
 function setAuthToken(token) {
-    localStorage.setItem("zenwork_token", token);
+    sessionStorage.setItem("zenwork_token", token);
 }
 
 function getAuthToken() {
-    return localStorage.getItem("zenwork_token");
+    return sessionStorage.getItem("zenwork_token");
 }
 
 function logout() {
+    sessionStorage.removeItem("zenwork_token");
+    sessionStorage.removeItem("zenwork_user");
     localStorage.removeItem("zenwork_token");
     localStorage.removeItem("zenwork_user");
     window.location.href = "login.html";

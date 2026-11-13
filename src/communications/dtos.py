@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional, List
+from typing import Optional
 from pydantic import BaseModel, ConfigDict
 from src.communications.models import NoticeScope, ChatRequestStatus
 from src.user.dtos import UserResponse
@@ -19,20 +19,21 @@ class CommunicationResponse(BaseModel):
     author: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)
 
-# Member-to-Member Schemas
 class SendChatInviteRequest(BaseModel):
     receiver_id: int
     initial_message: Optional[str] = "Hi, I'd like to connect regarding workspace tasks."
+    initial_attachment_url: Optional[str] = None
 
 class RespondChatInviteRequest(BaseModel):
-    status: ChatRequestStatus  # ACCEPTED, DECLINED, IGNORED
+    status: ChatRequestStatus
 
 class ChatRequestResponse(BaseModel):
     id: int
     sender_id: int
     receiver_id: int
     status: ChatRequestStatus
-    initial_message: Optional[str]
+    initial_message: Optional[str] = None
+    initial_attachment_url: Optional[str] = None
     created_at: datetime
     sender: Optional[UserResponse] = None
     receiver: Optional[UserResponse] = None
@@ -47,8 +48,8 @@ class DirectMessageResponse(BaseModel):
     id: int
     sender_id: int
     receiver_id: int
-    message_text: Optional[str]
-    attachment_url: Optional[str]
+    message_text: Optional[str] = None
+    attachment_url: Optional[str] = None
     created_at: datetime
     sender: Optional[UserResponse] = None
     model_config = ConfigDict(from_attributes=True)

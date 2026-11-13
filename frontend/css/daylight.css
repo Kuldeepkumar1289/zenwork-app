@@ -1,10 +1,6 @@
-/* =========================================================
-   ZENWORK DAYLIGHT — styles
-   1. Tokens   2. Base   3. Layout   4. Components
-   5. Hero & sky   6. Cards & tables   7. Modal & forms   8. Responsive
-   ========================================================= */
 
-/* ---------- 1. TOKENS (theme.js rewrites the colour ones every minute) ---------- */
+
+/*  1. TOKENS (theme.js rewrites the colour ones every minute)  */
 :root {
   --bg1: #bfe3d6;  --bg2: #f3efd9;           /* sky gradient          */
   --ink: #10372c;  --muted: #10372cb3;       /* text                  */
@@ -17,7 +13,7 @@
   --font-body: Figtree, system-ui, sans-serif;
 }
 
-/* ---------- 2. BASE ---------- */
+/*  2. BASE  */
 *, *::before, *::after { box-sizing: border-box; }
 html, body { height: 100%; margin: 0; }
 body {
@@ -35,7 +31,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .push { margin-left: auto; }
 .right { text-align: right; }
 
-/* ---------- 3. LAYOUT: sidebar | main | right rail ---------- */
+/*  3. LAYOUT: sidebar | main | right rail  */
 .app { display: flex; height: 100vh; gap: 16px; padding: 16px; }
 .sidebar { width: 245px; flex: none; display: flex; flex-direction: column; padding: 16px 12px; overflow-y: auto; }
 .main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -44,7 +40,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .rail { width: 310px; flex: none; display: flex; flex-direction: column; gap: 16px; overflow-y: auto; }
 .rail .grow { flex: 1; }
 
-/* ---------- 4. COMPONENTS ---------- */
+/*  4. COMPONENTS  */
 .glass { background: var(--glass); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: var(--radius) var(--radius) var(--radius) 8px; }
 
 /* buttons */
@@ -93,7 +89,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .profile b { font-size: 13px; }
 .avatar { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; background: var(--accent); color: var(--accent-ink); font-weight: 700; font-size: 13px; }
 
-/* ---------- 5. HERO & SKY (the one memorable element) ---------- */
+/*  5. HERO & SKY (the one memorable element)  */
 .hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
 .hero h1 { font-size: clamp(30px, 4.5vw, 52px); font-weight: 800; line-height: 1.05; margin: 6px 0; }
 .kicker { margin: 0; font-size: 13px; color: var(--muted); }
@@ -105,7 +101,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .scrub input { flex: 1; accent-color: var(--accent); }
 .scrub output { min-width: 5.5ch; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* ---------- 6. CARDS, STATS, TABLE ---------- */
+/*  6. CARDS, STATS, TABLE  */
 .card { padding: 18px 20px; }
 .card-head { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; }
 .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; }
@@ -143,7 +139,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .next-event { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 13px; }
 .meeting { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 12px; border-radius: 16px; background: #ffffff40; border: 1px solid var(--line); font-size: 13px; }
 
-/* ---------- 7. MODAL & FORM ---------- */
+/*  7. MODAL & FORM  */
 .modal { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center; background: #0006; }
 .modal-box { width: min(440px, 92vw); padding: 22px; border-radius: 22px; background: var(--bg2); color: var(--ink); box-shadow: 0 30px 80px #0006; }
 .form { display: flex; flex-direction: column; gap: 12px; font-size: 13px; }
@@ -152,7 +148,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .form-actions { display: flex; justify-content: flex-end; gap: 8px; }
 
-/* ---------- 8. RESPONSIVE ---------- */
+/*  8. RESPONSIVE  */
 @media (max-width: 1200px) { .rail { display: none; } }
 @media (max-width: 860px) {
   .app { flex-direction: column; height: auto; }
@@ -162,7 +158,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
 
-/* ---------- 9. COMPATIBILITY: HTML that your JS files render with Tailwind classes ---------- */
+/*  9. COMPATIBILITY: HTML that your JS files render with Tailwind classes  */
 /* Text follows the theme, so rows stay readable at night */
 #dashboardTasksBody, #noticesFeed, #upcomingMeetingsList, #miniCalDays { color: var(--ink); }
 #dashboardTasksBody .text-gray-900, #dashboardTasksBody .text-gray-800,
@@ -177,7 +173,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 #section-dynamic h1 { color: var(--ink) !important; font-family: var(--font-display); }
 #section-dynamic h1 ~ p { color: var(--muted) !important; }
 
-/* ---------- 10. AUTO-SYNC DYNAMIC PAGES WITH DAYLIGHT THEME ---------- */
+/*  10. AUTO-SYNC DYNAMIC PAGES WITH DAYLIGHT THEME  */
 /* Converts solid white cards inside #section-dynamic to Daylight glass */
 #section-dynamic .bg-white {
   background: var(--glass) !important;
@@ -214,8 +210,7 @@ small { display: block; font-size: 12px; color: var(--muted); }
 #section-dynamic .divide-\[\#F0F4F2\] > :not([hidden]) ~ :not([hidden]) {
   border-color: var(--line) !important;
 }
-
-/* ---------- 11. NIGHT MODE CONTRAST FIX (Inputs, Labels & Tabs) ---------- */
+/*  11. NIGHT MODE CONTRAST FIX (Inputs, Labels & Tabs)  */
 /* Make form inputs translucent glass so --ink text is always readable */
 #section-dynamic input:not([type="checkbox"]),
 #section-dynamic select,

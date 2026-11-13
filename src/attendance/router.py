@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from src.utils.db import get_db
 from src.utils.dependencies import get_current_user
 from src.user.models import User
+from src.attendance.leave_controller import get_user_quotas
 from src.attendance.dtos import (
     PunchInRequest,
     PunchOutRequest,
@@ -29,6 +30,14 @@ from src.attendance.leave_controller import (
 attendance_router = APIRouter(prefix="/attendance", tags=["Attendance & Work Sessions"])
 
 # --- Daily Punch In / Out Endpoints ---
+
+@attendance_router.get("/quotas", summary="Get employee Leave & WFH balances")
+def fetch_my_quotas(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_user_quotas(current_user, db)
+
 @attendance_router.post("/punch-in", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 def punch_in(
     data: PunchInRequest,
@@ -92,3 +101,42 @@ def get_leaves(
 ):
     """View leave & WFH requests (Self for Members, Team for Managers, All for Admins)."""
     return list_leave_requests(current_user=current_user, db=db)
+
+
+from src.attendance.dtos import (
+    RegularizationCreateRequest,
+    RegularizationReviewRequest,
+    RegularizationResponse
+)
+from src.attendance.service import (
+    submit_regularization_request,
+    list_regularization_requests,
+    review_regularization_request
+)
+
+@attendance_router.post("/regularize", response_model=RegularizationResponse, status_code=status.HTTP_201_CREATED)
+def apply_regularization(
+    data: RegularizationCreateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Submit a missed check-in / attendance regularization request."""
+    return submit_regularization_request(data=data, current_user=current_user, db=db)
+
+@attendance_router.get("/regularizations", response_model=List[RegularizationResponse])
+def get_regularizations(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """List attendance regularization requests scoped by role."""
+    return list_regularization_requests(current_user=current_user, db=db)
+
+@attendance_router.patch("/regularizations/{request_id}/review", response_model=RegularizationResponse)
+def review_regularization(
+    request_id: int,
+    data: RegularizationReviewRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Approve or reject an attendance regularization request."""
+    return review_regularization_request(request_id=request_id, data=data, current_user=current_user, db=db)

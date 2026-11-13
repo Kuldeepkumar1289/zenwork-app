@@ -14,7 +14,6 @@ class ChatRequestStatus(str, Enum):
     DECLINED = "DECLINED"
     IGNORED = "IGNORED"
 
-# Existing Notice/Broadcast table
 class Communication(Base):
     __tablename__ = "communications"
 
@@ -27,8 +26,6 @@ class Communication(Base):
 
     author = relationship("User", foreign_keys=[author_id])
 
-
-# 1. Chat Invitation / Handshake table
 class ChatRequest(Base):
     __tablename__ = "chat_requests"
 
@@ -36,15 +33,14 @@ class ChatRequest(Base):
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     receiver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     status = Column(SqlEnum(ChatRequestStatus), default=ChatRequestStatus.PENDING, nullable=False)
-    initial_message = Column(String(255), nullable=True)
+    initial_message = Column(String(500), nullable=True)
+    initial_attachment_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
     sender = relationship("User", foreign_keys=[sender_id])
     receiver = relationship("User", foreign_keys=[receiver_id])
 
-
-# 2. Member-to-Member Direct Messages table
 class DirectMessage(Base):
     __tablename__ = "direct_messages"
 
@@ -52,7 +48,7 @@ class DirectMessage(Base):
     sender_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     receiver_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     message_text = Column(Text, nullable=True)
-    attachment_url = Column(String(500), nullable=True)  # Voice note ya file URL
+    attachment_url = Column(String(500), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     sender = relationship("User", foreign_keys=[sender_id])

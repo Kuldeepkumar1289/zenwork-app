@@ -105,11 +105,14 @@ def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db
                     detail="Security Alert: Unrecognized device. If you forgot your phone, please connect to Company Wi-Fi."
                 )
 
-            if data.latitude is None or data.longitude is None:
-                raise HTTPException(
-                    status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="GPS location is mandatory for mobile check-in. Please enable location services."
-                )
+            if data.latitude is not None and data.longitude is not None:
+            
+                distance = calculate_distance(COMPANY_LAT, COMPANY_LNG, data.latitude, data.longitude)
+                if distance > MAX_RADIUS_METERS:
+                    raise HTTPException(
+                        status_code=status.HTTP_403_FORBIDDEN,
+                        detail=f"Geofence Error: You are {round(distance)} meters away from the office. Must be within {MAX_RADIUS_METERS}m."
+                    )
 
             distance = calculate_distance(COMPANY_LAT, COMPANY_LNG, data.latitude, data.longitude)
             if distance > MAX_RADIUS_METERS:

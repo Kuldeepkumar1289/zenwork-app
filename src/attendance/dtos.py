@@ -7,6 +7,9 @@ from src.user.dtos import UserResponse
 # --- Attendance DTOs ---
 class PunchInRequest(BaseModel):
     notes: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
+    device_fingerprint: Optional[str] = None
 
 class PunchOutRequest(BaseModel):
     notes: Optional[str] = None

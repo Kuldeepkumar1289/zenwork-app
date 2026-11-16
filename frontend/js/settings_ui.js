@@ -239,4 +239,6 @@ async function handleForgotPasswordReset(e) {
     }
 }
 
-registerSection("settings", renderSettingsSection);
+if (typeof registerSection === "function") {
+    registerSection("settings", renderSettingsSection);
+}

@@ -1,6 +1,6 @@
 from datetime import date
 from typing import Optional, List
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, status, Request
 from sqlalchemy.orm import Session
 from src.utils.db import get_db
 from src.utils.dependencies import get_current_user
@@ -40,12 +40,13 @@ def fetch_my_quotas(
 
 @attendance_router.post("/punch-in", response_model=AttendanceResponse, status_code=status.HTTP_201_CREATED)
 def punch_in(
+    request: Request,
     data: PunchInRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     """Punch in to start today's work shift."""
-    return punch_in_user(data=data, current_user=current_user, db=db)
+    return punch_in_user(request=request, data=data, current_user=current_user, db=db)
 
 @attendance_router.post("/punch-out", response_model=AttendanceResponse)
 def punch_out(

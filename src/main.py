@@ -17,6 +17,8 @@ from src.worker.scheduler import start_scheduler, stop_scheduler
 from src.admin.router import admin_router
 from src.events import models as event_models
 from src.events.router import router as events_router
+from fastapi.responses import JSONResponse
+from fastapi import Request
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)
@@ -65,6 +67,17 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    return JSONResponse(
+        status_code=500,
+        content={"detail": f"Server Error: {str(exc)}"},
+        headers={
+            "Access-Control-Allow-Origin": request.headers.get("origin", "*"),
+            "Access-Control-Allow-Credentials": "true",
+        },
+    )
 
 @app.get("/")
 def health_check():

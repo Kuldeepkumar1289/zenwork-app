@@ -32,7 +32,7 @@ function chatErrMsg(err) {
 function resolveMediaUrl(url) {
   if (!url) return "";
   if (url.startsWith("http://") || url.startsWith("https://")) return url;
-  const base = (typeof API_BASE_URL !== "undefined" ? API_BASE_URL : "http://127.0.0.1:8001/api/v1")
+  const base = (typeof API_BASE_URL !== "undefined" ? API_BASE_URL : "https://zenwork-app.onrender.com")
     .replace(/\/api\/v1\/?$/, "");
   return `${base}${url.startsWith("/") ? "" : "/"}${url}`;
 }

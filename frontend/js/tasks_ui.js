@@ -4,7 +4,7 @@ let currentTaskFilter = "ALL";
 async function renderTasksSection() {
     const container = document.getElementById("section-dynamic");
     container.innerHTML = `
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
                 <h1 class="text-2xl font-semibold text-gray-900">Tasks</h1>
                 <p class="text-xs text-gray-500 mt-0.5">All tasks. Clear ownership, real-time blockers, and attachments.</p>
@@ -14,10 +14,10 @@ async function renderTasksSection() {
             </button>
         </div>
 
-        <div class="grid grid-cols-12 gap-5 items-start">
-            <div class="col-span-8 bg-white rounded-2xl border border-[#E6ECE8] p-5">
-                <div class="flex items-center justify-between border-b border-[#F0F4F2] pb-3 mb-4">
-                    <div class="flex items-center gap-1.5 text-xs">
+        <div class="grid grid-cols-12 gap-4 sm:gap-5 items-start">
+            <div class="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5">
+                <div class="flex items-center justify-between flex-wrap gap-2 border-b border-[#F0F4F2] pb-3 mb-4">
+                    <div class="flex items-center gap-1.5 flex-wrap text-xs">
                         <button onclick="setTaskTabFilter('ALL')" id="tab-task-ALL" class="task-filter-btn px-3 py-1.5 rounded-lg bg-[#EBF3EF] text-[#1E6B52] font-medium">All tasks</button>
                         <button onclick="setTaskTabFilter('TODO')" id="tab-task-TODO" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">To Do</button>
                         <button onclick="setTaskTabFilter('IN_PROGRESS')" id="tab-task-IN_PROGRESS" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">In Progress</button>
@@ -28,12 +28,12 @@ async function renderTasksSection() {
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full text-left border-collapse">
+                    <table class="w-full min-w-[500px] text-left border-collapse">
                         <thead>
                             <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                                <th class="py-2.5">Task / Deliverable</th>
-                                <th class="py-2.5">Priority</th>
-                                <th class="py-2.5">Status</th>
+                                <th class="py-2.5 pr-2">Task / Deliverable</th>
+                                <th class="py-2.5 pr-2">Priority</th>
+                                <th class="py-2.5 pr-2">Status</th>
                                 <th class="py-2.5 text-right">Due</th>
                             </tr>
                         </thead>
@@ -44,8 +44,8 @@ async function renderTasksSection() {
                 </div>
             </div>
 
-            <div id="taskDetailDrawer" class="col-span-4 bg-white rounded-2xl border border-[#E6ECE8] p-5 sticky top-0">
-                <p class="text-xs text-gray-400 text-center py-10">Select any task from the left list to view details or report blockers.</p>
+            <div id="taskDetailDrawer" class="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 lg:sticky lg:top-0">
+                <p class="text-xs text-gray-400 text-center py-10">Select any task from the list to view details or report blockers.</p>
             </div>
         </div>
     `;
@@ -106,11 +106,11 @@ function renderMasterTasksList() {
             <tr onclick="selectTaskDetail(${task.id})" class="cursor-pointer transition ${isSelected ? 'bg-[#F2F8F5]' : 'hover:bg-[#F9FBFA]'}">
                 <td class="py-3.5 pr-2">
                     <p class="font-semibold text-gray-900">${task.title}</p>
-                    <p class="text-[11px] text-gray-400 truncate max-w-xs">${task.description || 'No description provided'}</p>
+                    <p class="text-[11px] text-gray-400 truncate max-w-[200px] sm:max-w-xs">${task.description || 'No description provided'}</p>
                 </td>
-                <td class="py-3.5"><span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${priorityBadges[task.priority]}">${task.priority}</span></td>
-                <td class="py-3.5"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColors[task.status]}">${task.status.replace("_", " ")}</span></td>
-                <td class="py-3.5 text-right text-gray-500">${dueStr}</td>
+                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${priorityBadges[task.priority]}">${task.priority}</span></td>
+                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColors[task.status]}">${task.status.replace("_", " ")}</span></td>
+                <td class="py-3.5 text-right text-gray-500 whitespace-nowrap">${dueStr}</td>
             </tr>
         `;
     }).join("");

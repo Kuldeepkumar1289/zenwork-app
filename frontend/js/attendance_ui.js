@@ -10,75 +10,75 @@ async function renderAttendanceSection() {
                 <h1 class="text-2xl font-semibold text-gray-900">Attendance, Leaves & WFH</h1>
                 <p class="text-xs text-gray-500 mt-0.5">Track work sessions, regularize missed check-ins, and manage leave/WFH quotas.</p>
             </div>
-            <div class="flex items-center gap-2.5 flex-wrap">
-                <button onclick="openRegModal()" class="px-4 py-2.5 rounded-xl border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-semibold transition cursor-pointer">
+            <div class="flex items-center gap-2 flex-wrap">
+                <button onclick="openRegModal()" class="px-3.5 py-2 rounded-xl border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-semibold transition cursor-pointer">
                     Regularize Attendance
                 </button>
-                <button onclick="openLeaveModal('WFH')" class="px-4 py-2.5 rounded-xl border border-[#1E6B52] text-[#1E6B52] hover:bg-[#EBF3EF] text-xs font-semibold transition cursor-pointer">
+                <button onclick="openLeaveModal('WFH')" class="px-3.5 py-2 rounded-xl border border-[#1E6B52] text-[#1E6B52] hover:bg-[#EBF3EF] text-xs font-semibold transition cursor-pointer">
                     + Apply WFH
                 </button>
-                <button onclick="openLeaveModal('CASUAL')" class="bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold px-4 py-2.5 rounded-xl transition cursor-pointer">
+                <button onclick="openLeaveModal('CASUAL')" class="bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold px-3.5 py-2 rounded-xl transition cursor-pointer">
                     + Apply Leave
                 </button>
             </div>
         </div>
 
-        <!-- 4 KPI Cards: Shift, Leave Balance, Monthly WFH Left, Work Mode -->
-        <div class="grid grid-cols-4 gap-4">
-            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
+        <!-- 4 KPI Cards: 2x2 on mobile/tablet, 4 columns on desktop -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
                 <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E6F4EA] text-[#1E6B52]">Today's Shift</span>
-                <p id="attTabTimer" class="text-2xl font-bold text-gray-900 mt-2">00h 00m</p>
+                <p id="attTabTimer" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">00h 00m</p>
                 <p id="attTabHours" class="text-[11px] text-gray-400 mt-0.5">0.0 hrs logged</p>
             </div>
 
-            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
-                <div class="flex items-center justify-between">
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
+                <div class="flex items-center justify-between gap-1 flex-wrap">
                     <p class="text-xs text-gray-500">Leave Balance</p>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#EBF3EF] text-[#1E6B52]">+2 / mo</span>
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-[#EBF3EF] text-[#1E6B52] whitespace-nowrap">+2 / mo</span>
                 </div>
-                <p id="attLeaveBalance" class="text-2xl font-bold text-gray-900 mt-2">2.0 days</p>
+                <p id="attLeaveBalance" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">2.0 days</p>
                 <p class="text-[11px] text-gray-400 mt-0.5">Carry-forward (min -5 allowed)</p>
             </div>
 
-            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
-                <div class="flex items-center justify-between">
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
+                <div class="flex items-center justify-between gap-1 flex-wrap">
                     <p class="text-xs text-gray-500">Monthly WFH Left</p>
-                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700">Resets monthly</span>
+                    <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 whitespace-nowrap">Resets monthly</span>
                 </div>
-                <p id="attWfhBalance" class="text-2xl font-bold text-gray-900 mt-2">2 / 2</p>
+                <p id="attWfhBalance" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">2 / 2</p>
                 <p class="text-[11px] text-gray-400 mt-0.5">Refreshes to 2 every month (min 0)</p>
             </div>
 
-            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
+            <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
                 <p class="text-xs text-gray-500">Today's Work Mode</p>
-                <p id="attTabMode" class="text-2xl font-semibold text-[#1E6B52] mt-2">Office</p>
+                <p id="attTabMode" class="text-xl sm:text-2xl font-semibold text-[#1E6B52] mt-2">Office</p>
                 <p class="text-[11px] text-gray-400 mt-0.5">Active workspace status</p>
             </div>
         </div>
 
-        <!-- Leave & WFH Requests Table with Separate Filter Tabs -->
-        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-5">
-            <div class="flex items-center justify-between mb-4">
+        <!-- Leave & WFH Requests Table -->
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <div>
                     <h2 class="text-sm font-semibold text-gray-900">Leave & WFH Approval Queue</h2>
                     <p class="text-[11px] text-gray-400">Balances deduct only when approved by a Manager or Admin.</p>
                 </div>
-                <div class="flex items-center gap-1.5 text-xs">
+                <div class="flex items-center gap-1.5 text-xs flex-wrap">
                     <button onclick="filterAttendanceTable('ALL', this)" class="att-filter-btn px-3 py-1 rounded-lg bg-[#EBF3EF] text-[#1E6B52] font-semibold">All</button>
                     <button onclick="filterAttendanceTable('LEAVE', this)" class="att-filter-btn px-3 py-1 rounded-lg text-gray-500">Leaves Only</button>
                     <button onclick="filterAttendanceTable('WFH', this)" class="att-filter-btn px-3 py-1 rounded-lg text-gray-500">WFH Only</button>
                 </div>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full min-w-[660px] text-left border-collapse">
                     <thead>
                         <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                            <th class="py-2.5">Applicant</th>
-                            <th class="py-2.5">Category</th>
-                            <th class="py-2.5">Dates</th>
-                            <th class="py-2.5">Days</th>
-                            <th class="py-2.5">Reason</th>
-                            <th class="py-2.5">Status</th>
+                            <th class="py-2.5 pr-3">Applicant</th>
+                            <th class="py-2.5 pr-3">Category</th>
+                            <th class="py-2.5 pr-3">Dates</th>
+                            <th class="py-2.5 pr-3">Days</th>
+                            <th class="py-2.5 pr-3">Reason</th>
+                            <th class="py-2.5 pr-3">Status</th>
                             <th class="py-2.5 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -90,20 +90,20 @@ async function renderAttendanceSection() {
         </div>
 
         <!-- Attendance Regularization Queue -->
-        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-5 mt-4">
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 mt-4">
             <div class="mb-3">
                 <h2 class="text-sm font-semibold text-gray-900">Attendance Regularization Requests</h2>
                 <p class="text-[11px] text-gray-400">Forgot to check in? Submit your actual shift start time for Manager/Admin approval.</p>
             </div>
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full min-w-[620px] text-left border-collapse">
                     <thead>
                         <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
-                            <th class="py-2.5">Employee</th>
-                            <th class="py-2.5">Date</th>
-                            <th class="py-2.5">Requested Shift</th>
-                            <th class="py-2.5">Reason</th>
-                            <th class="py-2.5">Status</th>
+                            <th class="py-2.5 pr-3">Employee</th>
+                            <th class="py-2.5 pr-3">Date</th>
+                            <th class="py-2.5 pr-3">Requested Shift</th>
+                            <th class="py-2.5 pr-3">Reason</th>
+                            <th class="py-2.5 pr-3">Status</th>
                             <th class="py-2.5 text-right">Actions</th>
                         </tr>
                     </thead>
@@ -115,8 +115,8 @@ async function renderAttendanceSection() {
         </div>
 
         <!-- Apply Leave / WFH Modal -->
-        <div id="leaveModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50">
-            <div class="bg-white rounded-2xl border border-[#E6ECE8] w-full max-w-md p-6 shadow-xl">
+        <div id="leaveModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-2xl border border-[#E6ECE8] w-full max-w-md p-5 sm:p-6 shadow-xl">
                 <div class="flex items-center justify-between mb-3">
                     <h3 id="leaveModalTitle" class="text-base font-semibold text-gray-900">Apply for Time Off</h3>
                     <button onclick="closeLeaveModal()" class="text-gray-400 hover:text-gray-700 text-lg">&times;</button>
@@ -132,7 +132,7 @@ async function renderAttendanceSection() {
                             <option value="WFH">Work From Home (Monthly quota)</option>
                         </select>
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Start Date</label>
                             <input type="date" id="leaveStartDate" required class="w-full px-3 py-2 rounded-xl border border-gray-200">
@@ -156,8 +156,8 @@ async function renderAttendanceSection() {
         </div>
 
         <!-- Regularize Attendance Modal -->
-        <div id="regModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center z-50">
-            <div class="bg-white rounded-2xl border border-[#E6ECE8] w-full max-w-md p-6 shadow-xl">
+        <div id="regModal" class="hidden fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-50">
+            <div class="bg-white rounded-2xl border border-[#E6ECE8] w-full max-w-md p-5 sm:p-6 shadow-xl">
                 <div class="flex items-center justify-between mb-3">
                     <h3 class="text-base font-semibold text-gray-900">Regularize Missed Attendance</h3>
                     <button onclick="closeRegModal()" class="text-gray-400 hover:text-gray-700 text-lg">&times;</button>
@@ -167,7 +167,7 @@ async function renderAttendanceSection() {
                         <label class="block font-medium text-gray-700 mb-1">Attendance Date</label>
                         <input type="date" id="regTargetDate" required class="w-full px-3 py-2 rounded-xl border border-gray-200">
                     </div>
-                    <div class="grid grid-cols-2 gap-3">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Actual Check-In Time</label>
                             <input type="time" id="regInTime" value="09:30" required class="w-full px-3 py-2 rounded-xl border border-gray-200">
@@ -326,22 +326,22 @@ function renderFilteredLeavesTable() {
             "REJECTED": "bg-red-50 text-red-700"
         };
         const typeBadge = item.leave_type === "WFH"
-            ? `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold">WFH (-${item.days_count}d)</span>`
-            : `<span class="px-2 py-0.5 rounded-md bg-[#EBF3EF] text-[#1E6B52] font-semibold">${item.leave_type} LEAVE (-${item.days_count}d)</span>`;
+            ? `<span class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 font-semibold whitespace-nowrap">WFH (-${item.days_count}d)</span>`
+            : `<span class="px-2 py-0.5 rounded-md bg-[#EBF3EF] text-[#1E6B52] font-semibold whitespace-nowrap">${item.leave_type} LEAVE (-${item.days_count}d)</span>`;
 
         const applicantName = item.applicant ? item.applicant.full_name : `User #${item.user_id}`;
 
         return `
             <tr class="hover:bg-[#F9FBFA]">
-                <td class="py-3 font-medium text-gray-900">${applicantName}</td>
-                <td class="py-3">${typeBadge}</td>
-                <td class="py-3 text-gray-600">${item.start_date} → ${item.end_date}</td>
-                <td class="py-3 font-medium">${item.days_count}d</td>
-                <td class="py-3 text-gray-500 max-w-xs truncate">${item.reason}</td>
-                <td class="py-3">
+                <td class="py-3 pr-3 font-medium text-gray-900 whitespace-nowrap">${applicantName}</td>
+                <td class="py-3 pr-3">${typeBadge}</td>
+                <td class="py-3 pr-3 text-gray-600 whitespace-nowrap">${item.start_date} → ${item.end_date}</td>
+                <td class="py-3 pr-3 font-medium whitespace-nowrap">${item.days_count}d</td>
+                <td class="py-3 pr-3 text-gray-500 max-w-xs truncate">${item.reason}</td>
+                <td class="py-3 pr-3">
                     <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusBadges[item.status]}">${item.status}</span>
                 </td>
-                <td class="py-3 text-right space-x-2">
+                <td class="py-3 text-right whitespace-nowrap space-x-2">
                     ${(canApprove && item.status === "PENDING") ? `
                         <button onclick="reviewLeaveAction(${item.id}, 'APPROVED')" class="px-2.5 py-1 rounded-lg bg-[#1E6B52] text-white text-[11px] hover:bg-[#15523E]">Approve</button>
                         <button onclick="reviewLeaveAction(${item.id}, 'REJECTED')" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] hover:bg-red-100">Reject</button>
@@ -424,12 +424,12 @@ async function loadRegularizations() {
             const name = r.applicant ? r.applicant.full_name : `User #${r.user_id}`;
             return `
                 <tr class="hover:bg-[#F9FBFA]">
-                    <td class="py-3 font-medium text-gray-900">${name}</td>
-                    <td class="py-3 text-gray-600">${r.target_date}</td>
-                    <td class="py-3 font-medium text-gray-800">${fmtT(r.requested_punch_in)} → ${fmtT(r.requested_punch_out)}</td>
-                    <td class="py-3 text-gray-500 max-w-xs truncate">${r.reason}</td>
-                    <td class="py-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${badges[r.status]}">${r.status}</span></td>
-                    <td class="py-3 text-right space-x-2">
+                    <td class="py-3 pr-3 font-medium text-gray-900 whitespace-nowrap">${name}</td>
+                    <td class="py-3 pr-3 text-gray-600 whitespace-nowrap">${r.target_date}</td>
+                    <td class="py-3 pr-3 font-medium text-gray-800 whitespace-nowrap">${fmtT(r.requested_punch_in)} → ${fmtT(r.requested_punch_out)}</td>
+                    <td class="py-3 pr-3 text-gray-500 max-w-xs truncate">${r.reason}</td>
+                    <td class="py-3 pr-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${badges[r.status]}">${r.status}</span></td>
+                    <td class="py-3 text-right whitespace-nowrap space-x-2">
                         ${(canApprove && r.status === "PENDING") ? `
                             <button onclick="reviewRegAction(${r.id}, 'APPROVED')" class="px-2.5 py-1 rounded-lg bg-[#1E6B52] text-white text-[11px] hover:bg-[#15523E]">Approve</button>
                             <button onclick="reviewRegAction(${r.id}, 'REJECTED')" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] hover:bg-red-100">Reject</button>

@@ -19,7 +19,7 @@ async function renderAdminSection() {
     }
 
     container.innerHTML = `
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
                 <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-600">MASTER CONTROL</span>
                 <h1 class="text-2xl font-semibold text-gray-900">Super Admin Panel</h1>
@@ -27,8 +27,8 @@ async function renderAdminSection() {
             </div>
         </div>
 
-        <!-- 5 Global Master KPI Cards -->
-        <div class="grid grid-cols-5 gap-3">
+        <!-- 5 Global Master KPI Cards (Responsive: 2 cols mobile, 3 tablet, 5 desktop) -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
                 <p class="text-[11px] text-gray-500">Total Members</p>
                 <p id="admTotalUsers" class="text-2xl font-bold text-gray-900 mt-1">0</p>
@@ -45,15 +45,15 @@ async function renderAdminSection() {
                 <p class="text-[11px] text-gray-500">Pending Leaves/WFH</p>
                 <p id="admLeaves" class="text-2xl font-bold text-amber-600 mt-1">0</p>
             </div>
-            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
+            <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8] col-span-2 sm:col-span-1">
                 <p class="text-[11px] text-gray-500">Open Queries</p>
                 <p id="admQueries" class="text-2xl font-bold text-[#1E6B52] mt-1">0</p>
             </div>
         </div>
 
         <!-- User Role & Co-Admin Delegation Table -->
-        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-5">
-            <div class="flex items-center justify-between mb-4">
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <div>
                     <h2 class="text-sm font-semibold text-gray-900">Workspace Members & Role Permissions</h2>
                     <p class="text-[11px] text-gray-400">Promote trusted members to Manager or Co-Admin (Max 3 Admins allowed)</p>
@@ -62,7 +62,7 @@ async function renderAdminSection() {
             </div>
 
             <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+                <table class="w-full min-w-[640px] text-left border-collapse">
                     <thead>
                         <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                             <th class="py-2.5">ID</th>
@@ -124,7 +124,7 @@ async function loadAdminDashboardData() {
                             <option value="ADMIN" ${u.role_tier === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
                         </select>
                     </td>
-                    <td class="py-3 text-right space-x-2">
+                    <td class="py-3 text-right whitespace-nowrap space-x-2">
                         <button onclick="saveUserAdminChanges(${u.id})" class="px-3 py-1 rounded-lg bg-[#1E6B52] hover:bg-[#15523E] text-white text-[11px] font-medium cursor-pointer">
                             Save
                         </button>

@@ -14,9 +14,8 @@ let dmAudioChunks = [];
 let dmRecordTimer = null;
 let dmRecordSeconds = 0;
 
-// Unread & latest-message state across all teammates
-let unreadByUser = {};       // { [userId]: { count, senderName, text, timeStr } }
-let latestMetaByUser = {};   // { [userId]: { text, at, timeStr, mine } }
+let unreadByUser = {};
+let latestMetaByUser = {};
 let lastToastMsgId = 0;
 let watcherBootstrapped = false;
 
@@ -54,7 +53,6 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-/*  Per-User Read Cursor Storage  */
 function getReadMap() {
   if (!currentUser?.id) return {};
   try {
@@ -75,7 +73,6 @@ function markPartnerRead(partnerId, maxMsgId) {
   updateGlobalUnreadBadges();
 }
 
-/*  Direct File / Image / Audio Download  */
 async function downloadChatFile(rawUrl, suggestedName) {
   const fullUrl = resolveMediaUrl(rawUrl);
   const fileName = suggestedName || rawUrl.split("/").pop() || "zenwork-file";
@@ -96,7 +93,6 @@ async function downloadChatFile(rawUrl, suggestedName) {
   }
 }
 
-/*  Floating Toast & Subtle Sound Alert  */
 function playSoftPing() {
   try {
     const Ctx = window.AudioContext || window.webkitAudioContext;
@@ -123,9 +119,10 @@ function showIncomingMessageToast(partnerId, senderName, text, timeStr) {
   toast.id = "zenChatToast";
   toast.style.cssText = `
     position: fixed;
-    bottom: 22px;
-    right: 22px;
+    bottom: 16px;
+    right: 16px;
     width: 320px;
+    max-width: calc(100vw - 32px);
     background: #FFFFFF;
     border: 1px solid #CBD5E1;
     border-left: 4px solid var(--accent, #4F46E5);
@@ -167,7 +164,6 @@ function showIncomingMessageToast(partnerId, senderName, text, timeStr) {
   }, 7000);
 }
 
-/*  Global Unread Badges (Sidebar + Topbar Bell)  */
 function updateGlobalUnreadBadges() {
   const totalUnreadMsgs = Object.values(unreadByUser).reduce((sum, item) => sum + (item.count || 0), 0);
   const totalAlerts = totalUnreadMsgs + pendingChatInvites.length;
@@ -231,7 +227,6 @@ window.getUnreadChatSummaries = function () {
   return list;
 };
 
-/*  Background Watcher (Runs Across All Sections)  */
 async function pollAllChatsAndNotifications() {
   if (!currentUser?.id || !getAuthToken()) return;
   if ((dmRecorder && dmRecorder.state === "recording") || showNoticeComposer || pendingAttachment) return;
@@ -339,9 +334,7 @@ async function pollAllChatsAndNotifications() {
         newBox.scrollTop = prevScrollTop;
       }
     }
-  } catch (e) {
-    // Silent background poll retry
-  }
+  } catch (e) {}
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -352,7 +345,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }, 1200);
 });
 
-/*  File Upload Helper  */
 async function uploadFileToBackend(fileOrBlob, filename) {
   const formData = new FormData();
   formData.append("file", fileOrBlob, filename);
@@ -367,7 +359,6 @@ async function uploadFileToBackend(fileOrBlob, filename) {
   return data.media_url;
 }
 
-/*  Section Entry Point  */
 async function renderChatsSection() {
   inviteNoticeText = "";
   const [notices, tree, invites] = await Promise.all([
@@ -569,7 +560,6 @@ async function sendChat(event) {
   }
 }
 
-/*  Voice Note Recorder  */
 async function startVoiceRecording() {
   const thread = chatThreads.find(t => t.id === chatActive);
   if (!thread || thread.kind !== "dm") return;
@@ -645,7 +635,6 @@ function cancelVoiceRecording() {
   }
 }
 
-/*  Attachment Renderer With Direct Download Button  */
 function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
   if (!rawUrl) return "";
   const fullUrl = resolveMediaUrl(rawUrl);
@@ -660,7 +649,7 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
 
   const downloadBar = (label) => `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
-      <span style="font-size:11px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:155px;">
+      <span style="font-size:11px;opacity:0.85;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:145px;">
         ${esc(label)}
       </span>
       <button type="button"
@@ -675,7 +664,7 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
       <div class="mt-2">
         <a href="${esc(fullUrl)}" target="_blank" rel="noopener" class="block">
           <img src="${esc(fullUrl)}" alt="${esc(safeFileName)}"
-            style="max-width:240px;max-height:185px;border-radius:12px;object-fit:cover;border:1px solid rgba(0,0,0,0.1);">
+            style="max-width:100%;max-height:185px;border-radius:12px;object-fit:cover;border:1px solid rgba(0,0,0,0.1);">
         </a>
         ${downloadBar(safeFileName)}
       </div>`;
@@ -684,7 +673,7 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
   if (/\.(webm|mp3|wav|ogg|m4a)$/.test(cleanPath)) {
     return `
       <div class="mt-2">
-        <audio controls src="${esc(fullUrl)}" style="height:36px;max-width:245px;"></audio>
+        <audio controls src="${esc(fullUrl)}" style="height:36px;max-width:100%;"></audio>
         ${downloadBar("Audio clip")}
       </div>`;
   }
@@ -693,17 +682,17 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
     return `
       <div class="mt-2">
         <video controls src="${esc(fullUrl)}"
-          style="max-width:245px;max-height:180px;border-radius:12px;"></video>
+          style="max-width:100%;max-height:180px;border-radius:12px;"></video>
         ${downloadBar(safeFileName)}
       </div>`;
   }
 
   return `
     <div class="mt-2 p-2.5 rounded-xl" style="background:rgba(15,23,42,0.08);">
-      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;">
         <div style="display:flex;align-items:center;gap:6px;min-width:0;">
           <span class="chip" style="font-size:10px;padding:1px 6px;">FILE</span>
-          <b style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:140px;">
+          <b style="font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:130px;">
             ${esc(safeFileName)}
           </b>
         </div>
@@ -716,9 +705,7 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
     </div>`;
 }
 
-/*  Main View Renderer  */
 function drawChats(scrollToBottom = true) {
-  // Prevent DOM re-render disruption if user is actively typing in the chat input
   const activeInput = document.getElementById("chatInput");
   if (activeInput && document.activeElement === activeInput && activeInput.value.trim().length > 0) {
     return;
@@ -742,7 +729,7 @@ function drawChats(scrollToBottom = true) {
               <span class="text-gray-400"> • ${formatChatLocalTime(inv.created_at)}</span>
               ${inv.initial_message ? `<span class="block text-gray-500 mt-0.5">"${esc(inv.initial_message)}"</span>` : ""}
             </div>
-            <div class="flex items-center gap-1.5">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <button type="button" class="btn btn-primary" style="padding:5px 12px;font-size:12px;"
                 onclick="respondChatInvite(${inv.id}, 'ACCEPTED')">Accept</button>
               <button type="button" class="btn btn-ghost" style="padding:5px 10px;font-size:12px;"
@@ -808,7 +795,7 @@ function drawChats(scrollToBottom = true) {
     const noticeCards = active.messages.length
       ? active.messages.map(n => `
           <article class="p-4 rounded-2xl bg-white border border-gray-100 shadow-sm mb-3">
-            <div class="flex items-center justify-between gap-2 mb-2">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
               <div class="flex items-center gap-2.5">
                 <span class="avatar sm">${initials(n.from)}</span>
                 <div>
@@ -824,7 +811,7 @@ function drawChats(scrollToBottom = true) {
       : emptyState("No workspace updates posted yet.");
 
     mainPaneHtml = `
-      <div class="chat-title flex items-center justify-between">
+      <div class="chat-title flex items-center justify-between flex-wrap gap-2">
         <div>
           <b># workspace-updates</b>
           <span class="block text-[11px] muted">Official notices &amp; announcements</span>
@@ -870,7 +857,7 @@ function drawChats(scrollToBottom = true) {
       : "";
 
     const bottomBarHtml = isRecording
-      ? `<div class="chat-compose flex items-center justify-between gap-2" style="background:#FFF1F2;">
+      ? `<div class="chat-compose flex items-center justify-between flex-wrap gap-2" style="background:#FFF1F2;">
            <div class="flex items-center gap-2 text-xs font-semibold text-red-600">
              <span>Recording Voice Note...</span>
              <span id="voiceTimerText">0:${String(dmRecordSeconds).padStart(2, "0")}</span>
@@ -880,7 +867,7 @@ function drawChats(scrollToBottom = true) {
              <button type="button" onclick="stopAndSendVoiceRecording()" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">Send Voice</button>
            </div>
          </div>`
-      : `<form class="chat-compose" onsubmit="sendChat(event)">
+      : `<form class="chat-compose flex-wrap" onsubmit="sendChat(event)">
            <input type="file" id="chatFileInput" class="hidden"
              accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
              onchange="handleChatFileSelected(event)">
@@ -888,12 +875,12 @@ function drawChats(scrollToBottom = true) {
              style="padding:7px 11px;font-size:12px;font-weight:600;" title="Attach Image, PDF, or File">+ Attach</button>
            <button type="button" onclick="startVoiceRecording()" class="btn btn-ghost"
              style="padding:7px 11px;font-size:12px;font-weight:600;" title="Record Voice Note">Voice</button>
-           <input id="chatInput" placeholder="Message ${esc(active.name)} or attach media..." autocomplete="off">
+           <input id="chatInput" style="min-width:140px;" placeholder="Message ${esc(active.name)}..." autocomplete="off">
            <button type="submit" id="chatSendBtn" class="btn btn-primary">Send</button>
          </form>`;
 
     mainPaneHtml = `
-      <div class="chat-title flex items-center justify-between">
+      <div class="chat-title flex items-center justify-between flex-wrap gap-2">
         <div class="flex items-center gap-2.5">
           <span class="avatar sm">${initials(active.name)}</span>
           <div>

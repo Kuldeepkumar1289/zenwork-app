@@ -14,7 +14,7 @@ async function renderProfileSection() {
         .slice(0, 2);
 
     container.innerHTML = `
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
                 <p class="text-[10px] font-semibold uppercase tracking-wider text-[#1E6B52]">ACCOUNT & PREFERENCES</p>
                 <h1 class="text-2xl font-semibold text-gray-900 mt-0.5">Your space in the workspace.</h1>
@@ -22,17 +22,17 @@ async function renderProfileSection() {
             </div>
         </div>
 
-        <div class="grid grid-cols-12 gap-5 items-start">
+        <div class="grid grid-cols-12 gap-4 sm:gap-5 items-start">
             
-            <!-- LEFT: Personal Details & Workspace Preferences (8 Columns) -->
-            <div class="col-span-8 bg-white rounded-2xl border border-[#E6ECE8] p-6 space-y-5">
-                <div class="flex items-center gap-4 pb-5 border-b border-[#F0F4F2]">
-                    <div class="w-14 h-14 rounded-2xl bg-[#1E6B52] text-white flex items-center justify-center text-lg font-bold">
+            <!-- LEFT: Personal Details & Workspace Preferences (Full width on mobile, 8 cols on PC) -->
+            <div class="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-6 space-y-5">
+                <div class="flex items-center gap-3.5 sm:gap-4 pb-5 border-b border-[#F0F4F2]">
+                    <div class="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-[#1E6B52] text-white flex items-center justify-center text-base sm:text-lg font-bold shrink-0">
                         ${initials}
                     </div>
-                    <div>
-                        <h2 class="text-base font-semibold text-gray-900">${currentUser.full_name}</h2>
-                        <p class="text-xs text-gray-500">${currentUser.designation} • ${currentUser.email}</p>
+                    <div class="min-w-0">
+                        <h2 class="text-base font-semibold text-gray-900 truncate">${currentUser.full_name}</h2>
+                        <p class="text-xs text-gray-500 truncate">${currentUser.designation} •${currentUser.email}</p>
                         <span class="inline-block mt-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-[#E6F4EA] text-[#1E6B52]">
                             ${currentUser.role_tier} TIER
                         </span>
@@ -40,7 +40,7 @@ async function renderProfileSection() {
                 </div>
 
                 <form id="profileUpdateForm" class="space-y-4 text-xs">
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Full Name</label>
                             <input type="text" id="profFullName" value="${currentUser.full_name}" required
@@ -53,7 +53,7 @@ async function renderProfileSection() {
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Work Email (Read-only)</label>
                             <input type="email" value="${currentUser.email}" disabled
@@ -69,33 +69,33 @@ async function renderProfileSection() {
                     <!-- Notification & Privacy Toggles -->
                     <div class="pt-4 border-t border-[#F0F4F2] space-y-3">
                         <h3 class="text-xs font-semibold text-gray-900">Workspace Settings</h3>
-                        <label class="flex items-center justify-between p-3 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8] cursor-pointer">
+                        <label class="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8] cursor-pointer">
                             <div>
                                 <p class="font-medium text-gray-800">Task & Blocker Alerts</p>
                                 <p class="text-[11px] text-gray-400">Receive instant notifications when tasks are assigned or blocked</p>
                             </div>
-                            <input type="checkbox" checked class="w-4 h-4 accent-[#1E6B52]">
+                            <input type="checkbox" checked class="w-4 h-4 shrink-0 accent-[#1E6B52]">
                         </label>
-                        <label class="flex items-center justify-between p-3 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8] cursor-pointer">
+                        <label class="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8] cursor-pointer">
                             <div>
                                 <p class="font-medium text-gray-800">Require Approval for Direct Chats</p>
                                 <p class="text-[11px] text-gray-400">Show Accept / Decline / Ignore popup before new teammates message you</p>
                             </div>
-                            <input type="checkbox" checked class="w-4 h-4 accent-[#1E6B52]">
+                            <input type="checkbox" checked class="w-4 h-4 shrink-0 accent-[#1E6B52]">
                         </label>
                     </div>
 
                     <div class="pt-2 flex justify-end">
-                        <button type="submit" class="px-5 py-2.5 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white font-semibold transition cursor-pointer">
+                        <button type="submit" class="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white font-semibold transition cursor-pointer">
                             Save changes
                         </button>
                     </div>
                 </form>
             </div>
 
-            <!-- RIGHT: Account Metadata & Security Card (4 Columns) -->
-            <div class="col-span-4 space-y-4">
-                <div class="bg-white rounded-2xl border border-[#E6ECE8] p-5 space-y-3 text-xs">
+            <!-- RIGHT: Account Metadata & Security Card (Full width on mobile, 4 cols on PC) -->
+            <div class="col-span-12 lg:col-span-4 space-y-4">
+                <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 space-y-3 text-xs">
                     <h3 class="text-sm font-semibold text-gray-900">Account Information</h3>
                     <div class="flex justify-between py-1.5 border-b border-[#F6F8F7]">
                         <span class="text-gray-400">Employee ID</span>
@@ -115,7 +115,7 @@ async function renderProfileSection() {
                     </div>
                 </div>
 
-                <div class="bg-white rounded-2xl border border-[#E6ECE8] p-5 space-y-3 text-xs">
+                <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 space-y-3 text-xs">
                     <h3 class="text-sm font-semibold text-gray-900">Security & Session</h3>
                     <p class="text-[11px] text-gray-500">Signed in with JWT Bearer authentication. Sign out from all devices if using a shared system.</p>
                     <button onclick="logout()" class="w-full py-2.5 px-4 rounded-xl border border-red-200 text-red-600 font-semibold hover:bg-red-50 transition cursor-pointer">
@@ -133,7 +133,6 @@ async function renderProfileSection() {
         const updatedDesignation = document.getElementById("profDesignation").value;
 
         try {
-            // Update local profile state and sync if admin endpoint is available
             if (currentUser.role_tier === "ADMIN") {
                 await apiRequest(`/admin/users/${currentUser.id}`, "PATCH", {
                     full_name: updatedName,

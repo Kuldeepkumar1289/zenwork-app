@@ -18,7 +18,7 @@
 html, body { height: 100%; margin: 0; }
 body {
   font-family: var(--font-body); color: var(--ink);
-  background: linear-gradient(180deg, var(--bg1), var(--bg2) 75%) fixed;
+  background: linear-gradient(180deg, var(--bg1), var(--bg2) 100%) fixed;
 }
 h1, h2 { font-family: var(--font-display); margin: 0; letter-spacing: -.02em; }
 h2 { font-size: 17px; }
@@ -319,4 +319,55 @@ small { display: block; font-size: 12px; color: var(--muted); }
 /* Fix hardcoded green text/badges in dark mode to use dynamic accent */
 #section-dynamic .text-\[\#1E6B52\] {
   color: var(--accent) !important;
+}
+
+/*  12. MOBILE POLISH (Attendance 2x2 Grid, Tables & KPIs)  */
+@media (max-width: 860px) {
+
+  .stat b {
+    font-size: 24px !important;
+    white-space: nowrap;
+  }
+
+  /* Attendance & Leaves  4 cards  2x2 grid  */
+  #section-dynamic .grid-cols-4,
+  #section-dynamic .md\:grid-cols-4,
+  #section-dynamic .lg\:grid-cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+  }
+
+  #section-dynamic .grid-cols-4 > div,
+  #section-dynamic .md\:grid-cols-4 > div {
+    padding: 14px !important;
+    min-width: 0;
+  }
+
+  /* Leave & Regularization tables mobile  smoothly scroll  */
+  #section-dynamic table {
+    display: block;
+    width: 100%;
+    overflow-x: auto;
+    white-space: nowrap;
+  }
+
+  .topbar .search {
+    order: 3;
+    max-width: 100%;
+    width: 100%;
+    margin: 4px 0 0 0;
+  }
+
+  /*Quick Check-in bar show on mobile */
+  .mobile-checkin-bar {
+    display: flex !important;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 14px 16px;
+  }
+}
+
+.mobile-checkin-bar {
+  display: none;
 }

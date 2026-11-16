@@ -78,7 +78,6 @@ async function loadTasks() {
 
         renderTasksTable(allTasks);
 
-        // Show today's deadlines as dots on the sky arc (sky.js)
         if (window.DaylightSky) {
             const todayStr = new Date().toDateString();
             DaylightSky.setMarkers(allTasks
@@ -400,10 +399,8 @@ function toggleMobileSidebar(forceState) {
 }
 
 function switchSection(sectionName) {
-    // Auto-close mobile drawer when any section is chosen
     toggleMobileSidebar(false);
 
-    // Highlight selected sidebar button
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.classList.remove("is-active");
     });
@@ -480,6 +477,7 @@ document.addEventListener("DOMContentLoaded", () => {
       top: ${rect.bottom + 10}px;
       right: ${Math.max(16, window.innerWidth - rect.right)}px;
       width: 315px;
+      max-width: calc(100vw - 32px);
       background: #FFFFFF;
       border: 1px solid #E2E8F0;
       border-radius: 16px;

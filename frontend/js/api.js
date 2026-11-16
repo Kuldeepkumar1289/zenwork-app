@@ -1,4 +1,4 @@
-const API_BASE_URL = "https://zenwork-app.onrender.com";
+const API_BASE_URL = "https://zenwork-app.onrender.com/api/v1";
 
 // Per-tab Token management (keeps each browser tab's login session separate)
 function setAuthToken(token) {

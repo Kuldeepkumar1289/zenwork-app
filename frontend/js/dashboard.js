@@ -472,20 +472,34 @@ document.addEventListener("DOMContentLoaded", () => {
     const box = document.createElement("div");
     box.id = "zenPopover";
     box.dataset.owner = key;
-    box.style.cssText = `
-      position: fixed;
-      top: ${rect.bottom + 10}px;
-      right: ${Math.max(16, window.innerWidth - rect.right)}px;
-      width: 315px;
-      max-width: calc(100vw - 32px);
-      background: #FFFFFF;
-      border: 1px solid #E2E8F0;
-      border-radius: 16px;
-      box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
-      padding: 14px 16px;
-      z-index: 9999;
-      color: #0F172A;
-    `;
+    box.style.cssText = isMobile
+      ? `
+        position: fixed;
+        top: ${rect.bottom + 10}px;
+        left: 14px;
+        right: 14px;
+        width: auto;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+        padding: 14px 16px;
+        z-index: 9999;
+        color: #0F172A;
+      `
+      : `
+        position: fixed;
+        top: ${rect.bottom + 10}px;
+        right: ${Math.max(16, window.innerWidth - rect.right)}px;
+        width: 315px;
+        background: #FFFFFF;
+        border: 1px solid #E2E8F0;
+        border-radius: 16px;
+        box-shadow: 0 18px 40px rgba(15, 23, 42, 0.14);
+        padding: 14px 16px;
+        z-index: 9999;
+        color: #0F172A;
+      `;
     box.innerHTML = `
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
         <b style="font-size:13px;color:#0F172A;">${title}</b>

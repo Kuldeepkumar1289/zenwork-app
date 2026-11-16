@@ -1,16 +1,34 @@
 from datetime import datetime, timezone, date
 from typing import Optional
 from sqlalchemy.orm import Session
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status, Request
+from math import radians, sin, cos, sqrt, atan2
+
 from src.attendance.models import Attendance, AttendanceStatus
 from src.attendance.dtos import PunchInRequest, PunchOutRequest, TeamAttendanceReport
 from src.user.models import User, RoleTier
 from src.tasks.controller import get_subordinate_ids
 
+# --- GEOFENCING & NETWORK CONFIGURATION ---
+COMPANY_LAT = 28.4595         # Apne office ki latitude daalein
+COMPANY_LNG = 77.0266         # Apne office ki longitude daalein
+MAX_RADIUS_METERS = 500.0     # 500 meters geofence limit
+OFFICE_SUBNET_PREFIX = "192.168.100." # Company office router/gateway IP prefix for emergency fallback
+
 
 def get_utc_now() -> datetime:
     """Consistent naive UTC datetime for MySQL compatibility."""
     return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def calculate_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Haversine formula to calculate distance in meters between two GPS coordinates."""
+    R = 6371000  # Earth radius in meters
+    dlat = radians(lat2 - lat1)
+    dlon = radians(lon2 - lon1)
+    a = sin(dlat / 2)**2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(dlon / 2)**2
+    c = 2 * atan2(sqrt(a), sqrt(1 - a))
+    return R * c
 
 
 def close_stale_previous_shifts(user_id: int, db: Session) -> None:
@@ -32,7 +50,7 @@ def close_stale_previous_shifts(user_id: int, db: Session) -> None:
         db.commit()
 
 
-def punch_in_user(data: PunchInRequest, current_user: User, db: Session) -> Attendance:
+def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db: Session) -> Attendance:
     close_stale_previous_shifts(current_user.id, db)
     now = get_utc_now()
     today = now.date()
@@ -55,6 +73,52 @@ def punch_in_user(data: PunchInRequest, current_user: User, db: Session) -> Atte
             detail="Punch-in already completed and ended for today."
         )
 
+    # --- SECURITY & LOCATION VALIDATION LOGIC ---
+    
+    # 1. Check if user has an approved WFH or Leave request for today
+    # (Aapke project ke leave/WFH model ke mutabiq yeh query adjust ki ja sakti hai)
+    is_wfh_approved = False # db.query(...).filter(...).first() 
+
+    if not is_wfh_approved:
+        # Extract client IP for company Wi-Fi detection (Emergency Fallback)
+        client_ip = request.client.host
+        forwarded_for = request.headers.get("X-Forwarded-For")
+        if forwarded_for:
+            client_ip = forwarded_for.split(",")[0].strip()
+
+        is_on_company_wifi = client_ip.startswith(OFFICE_SUBNET_PREFIX)
+        
+        # Check if device matches user's registered primary device
+        # (Aapke User model ya UserDevice table mein registered fingerprint se compare karein)
+        registered_fingerprint = getattr(current_user, "device_fingerprint", None)
+        is_trusted_device = (registered_fingerprint is None) or (data.device_fingerprint == registered_fingerprint)
+
+        # CONDITION 2: Emergency Fallback (Phone forgotten/broken -> Laptop connected to Company Wi-Fi)
+        if is_on_company_wifi:
+            # Company Wi-Fi is verified, allow check-in even from alternative/laptop device
+            pass
+        else:
+            # CONDITION 1: Normal Daily Flow (Phone -> Must match device + 500m Geofence)
+            if not is_trusted_device:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Security Alert: Unrecognized device. If you forgot your phone, please connect to Company Wi-Fi."
+                )
+
+            if data.latitude is None or data.longitude is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="GPS location is mandatory for mobile check-in. Please enable location services."
+                )
+
+            distance = calculate_distance(COMPANY_LAT, COMPANY_LNG, data.latitude, data.longitude)
+            if distance > MAX_RADIUS_METERS:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail=f"Geofence Error: You are {round(distance)} meters away from the office. Must be within {MAX_RADIUS_METERS}m."
+                )
+
+    # Proceed to save attendance record
     record = Attendance(
         user_id=current_user.id,
         date=today,
@@ -138,6 +202,8 @@ def get_team_attendance_summary(query_date: Optional[date], current_user: User, 
         records=records
     )
 
+
+# --- REGULARIZATION MODULE ---
 from src.attendance.models import AttendanceRegularization, RegularizationStatus
 from src.attendance.dtos import RegularizationCreateRequest, RegularizationReviewRequest
 

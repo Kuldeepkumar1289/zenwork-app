@@ -180,26 +180,46 @@ async function markTaskDone(taskId) {
 let shiftTimerInterval = null;
 
 async function loadTodayAttendance() {
-    try {
-        todayAttendance = await apiRequest("/attendance/me/today");
-        const btn = document.getElementById("punchActionBtn");
-        const timerDisplay = document.getElementById("shiftTimerDisplay");
-        const statusLabel = document.getElementById("shiftStatusLabel");
-        const pulseDot = document.getElementById("livePulseDot");
+    const timerDisplay = document.getElementById("shiftTimerDisplay");
+    const statHours = document.getElementById("statHours");
+    const statusLabel = document.getElementById("shiftStatusLabel");
+    const btn = document.getElementById("punchActionBtn");
+    const pulseDot = document.getElementById("livePulseDot");
+    const statAttBadge = document.getElementById("statAttBadge");
 
+    try {
+        const todayAttendance = await apiRequest("/attendance/me/today");
+        
         if (shiftTimerInterval) clearInterval(shiftTimerInterval);
 
-        if (!todayAttendance) {
-            btn.textContent = "Check in";
-            statusLabel.textContent = "Not checked in";
-        } else if (!todayAttendance.punch_out) {
-            btn.textContent = "Check out";
-            pulseDot.className = "w-1.5 h-1.5 rounded-full bg-[#1E6B52] animate-pulse";
-            statusLabel.textContent = "Checked in";
+        // Agar database mein aaj ki koi attendance entry nahi hai (null ya empty)
+        if (!todayAttendance || !todayAttendance.punch_in) {
+            if (btn) {
+                btn.textContent = "Check in";
+                btn.disabled = false;
+                btn.className = "btn wide btn-primary";
+            }
+            if (statusLabel) statusLabel.textContent = "Not checked in";
+            
+            // Yahan ensure kar rahe hain ki 0 min hi dikhe
+            if (timerDisplay) timerDisplay.textContent = "0 min";
+            if (statHours) statHours.textContent = "0 min";
+            if (statAttBadge) statAttBadge.textContent = "Offline";
+            if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-gray-400";
+        } 
+        else if (!todayAttendance.punch_out) {
+            if (btn) {
+                btn.textContent = "Check out";
+                btn.disabled = false;
+            }
+            if (statusLabel) statusLabel.textContent = "Checked in";
+            if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-[#1E6B52] animate-pulse";
 
-            // Parse timestamp safely without forcing +5:30 UTC offset
-            const rawStr = todayAttendance.punch_in.replace("Z", "");
-            const punchIn = new Date(rawStr);
+            let punchInStr = todayAttendance.punch_in;
+            if (!punchInStr.endsWith("Z") && !punchInStr.includes("+") && !punchInStr.includes("gmt")) {
+                punchInStr += "Z";
+            }
+const punchIn = new Date(punchInStr);
 
             const updateClock = () => {
                 const diffMs = Math.max(0, Date.now() - punchIn.getTime());
@@ -207,29 +227,41 @@ async function loadTodayAttendance() {
                 const hh = Math.floor(totalMins / 60);
                 const mm = totalMins % 60;
                 
-                // Live clock format: "5 min" ya "1h 15m"
                 const liveStr = hh > 0 ? `${hh}h ${mm}m` : `${mm} min`;
 
-                timerDisplay.textContent = liveStr;
-                document.getElementById("statHours").textContent = liveStr;
-                document.getElementById("statAttBadge").textContent = "Active";
+                if (timerDisplay) timerDisplay.textContent = liveStr;
+                if (statHours) statHours.textContent = liveStr;
+                if (statAttBadge) statAttBadge.textContent = "Active";
             };
 
             updateClock();
-            shiftTimerInterval = setInterval(updateClock, 30000); // Update every 30s
-        } else {
-            btn.textContent = "Shift Completed";
-            btn.disabled = true;
-            btn.className = "btn wide opacity-60 cursor-not-allowed";
+            shiftTimerInterval = setInterval(updateClock, 1000); // 1-second live tick
+        } 
+        else {
+            if (btn) {
+                btn.textContent = "Shift Completed";
+                btn.disabled = true;
+                btn.className = "btn wide opacity-60 cursor-not-allowed";
+            }
+            if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-gray-400";
             
-            // Ye raha apka naya formatting logic:
             const formattedTotal = formatDuration(todayAttendance.total_hours);
-            timerDisplay.textContent = formattedTotal;
-            statusLabel.textContent = todayAttendance.status;
-            document.getElementById("statHours").textContent = formattedTotal;
-            document.getElementById("statAttBadge").textContent = todayAttendance.status;
+            if (timerDisplay) timerDisplay.textContent = formattedTotal;
+            if (statusLabel) statusLabel.textContent = todayAttendance.status || "Completed";
+            if (statHours) statHours.textContent = formattedTotal;
+            if (statAttBadge) statAttBadge.textContent = todayAttendance.status || "Completed";
         }
-    } catch (e) {}
+    } catch (e) {
+        console.error("Attendance API Error:", e);
+        // SAFETY FALLBACK: Agar API fail ho ya error aaye, tab bhi hardcoded 5h 30m hata kar 0 min kar do
+        if (timerDisplay) timerDisplay.textContent = "0 min";
+        if (statHours) statHours.textContent = "0 min";
+        if (statusLabel) statusLabel.textContent = "Not checked in";
+        if (btn) {
+            btn.textContent = "Check in";
+            btn.disabled = false;
+        }
+    }
 }
 
 async function handlePunchToggle() {
@@ -542,3 +574,11 @@ function formatDuration(totalHours) {
     const mm = totalMins % 60;
     return mm === 0 ? `${hh}h` : `${hh}h ${mm}m`;
 }
+
+document.addEventListener("keydown", (e) => {
+  if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+    e.preventDefault(); // Browser ke URL bar focus ko rokein
+    const searchInput = document.querySelector("input[placeholder*='Search']");
+    if (searchInput) searchInput.focus();
+  }
+});

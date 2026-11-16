@@ -12,3 +12,6 @@ python-multipart
 redis
 websockets
 passlib
+apscheduler
+pymysql
+cryptography

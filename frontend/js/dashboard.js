@@ -1,11 +1,9 @@
-
 let currentUser = null;
 let allTasks = [];
 let todayAttendance = null;
 
 // 1. APP STARTUP: Runs automatically when index.html opens
 document.addEventListener("DOMContentLoaded", async () => {
-    // Check if user is logged in; if not, go to login page
     if (!getAuthToken()) {
         window.location.href = "login.html";
         return;
@@ -15,12 +13,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     drawMiniCalendar();
 
     try {
-        // Step A: Fetch current logged-in user details from backend
         currentUser = await apiRequest("/users/me");
         localStorage.setItem("zenwork_user", JSON.stringify(currentUser));
         updateProfileUI(currentUser);
 
-        // Step B: Load all dashboard widgets at the same time
         await Promise.all([
             loadTasks(),
             loadTodayAttendance(),
@@ -33,7 +29,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 });
 
-// Sets current date in top-right badge (e.g., "Thu, 12 November 2026")
+// Sets current date in top-right badge
 function setTodayDate() {
     const dateEl = document.getElementById("heroDate") || document.getElementById("headerDate");
     if (dateEl) {
@@ -64,17 +60,21 @@ function updateProfileUI(user) {
     }
 }
 
-// 2. TASKS TABLE & FILTERING
+// 2. TASKS KPI & SKY MARKERS
 async function loadTasks() {
     try {
         const response = await apiRequest("/tasks/");
         allTasks = Array.isArray(response) ? response : (response.items || []);
 
-        // Update KPI numbers
         const completed = allTasks.filter(t => t.status === "COMPLETED").length;
-        document.getElementById("taskCountBadge").textContent = allTasks.length;
-        document.getElementById("statCompletedTasks").textContent = completed;
-        document.getElementById("statTotalTasksSub").textContent = `of ${allTasks.length} assigned`;
+        const countBadge = document.getElementById("taskCountBadge");
+        if (countBadge) countBadge.textContent = allTasks.length;
+
+        const completedEl = document.getElementById("statCompletedTasks");
+        if (completedEl) completedEl.textContent = completed;
+
+        const totalSubEl = document.getElementById("statTotalTasksSub");
+        if (totalSubEl) totalSubEl.textContent = `of ${allTasks.length} assigned`;
 
         renderTasksTable(allTasks);
 
@@ -89,13 +89,16 @@ async function loadTasks() {
                 }));
         }
     } catch (err) {
-        document.getElementById("dashboardTasksBody").innerHTML =
-            `<tr><td colspan="5" class="py-4 text-center text-red-500">Could not load tasks</td></tr>`;
+        const tbody = document.getElementById("dashboardTasksBody");
+        if (tbody) {
+            tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-red-500">Could not load tasks</td></tr>`;
+        }
     }
 }
 
 function renderTasksTable(tasksList) {
     const tbody = document.getElementById("dashboardTasksBody");
+    if (!tbody) return;
 
     if (!tasksList.length) {
         tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-400">No tasks found. Click "+ Create new" to add one.</td></tr>`;
@@ -138,7 +141,6 @@ function renderTasksTable(tasksList) {
     }).join("");
 }
 
-// Handles clicking "Upcoming", "In progress", or "Completed" tabs
 function filterDashboardTasks(status, clickedBtn) {
     document.querySelectorAll(".dash-tab").forEach(tab => {
         tab.classList.remove("font-semibold", "text-gray-900", "border-b-2", "border-[#1E6B52]");
@@ -158,7 +160,6 @@ function filterDashboardTasks(status, clickedBtn) {
     }
 }
 
-// Live search filter from top header input
 function handleSearchFilter(query) {
     const q = query.toLowerCase();
     const filtered = allTasks.filter(t => t.title.toLowerCase().includes(q));
@@ -174,9 +175,7 @@ async function markTaskDone(taskId) {
     }
 }
 
-
-// 3. ATTENDANCE & SHIFT TIMER (Right Utility Panel)
-
+// 3. ATTENDANCE & SHIFT TIMER
 let shiftTimerInterval = null;
 
 async function loadTodayAttendance() {
@@ -188,11 +187,10 @@ async function loadTodayAttendance() {
     const statAttBadge = document.getElementById("statAttBadge");
 
     try {
-        const todayAttendance = await apiRequest("/attendance/me/today");
-        
+        todayAttendance = await apiRequest("/attendance/me/today");
+
         if (shiftTimerInterval) clearInterval(shiftTimerInterval);
 
-        // Agar database mein aaj ki koi attendance entry nahi hai (null ya empty)
         if (!todayAttendance || !todayAttendance.punch_in) {
             if (btn) {
                 btn.textContent = "Check in";
@@ -200,14 +198,11 @@ async function loadTodayAttendance() {
                 btn.className = "btn wide btn-primary";
             }
             if (statusLabel) statusLabel.textContent = "Not checked in";
-            
-            // Yahan ensure kar rahe hain ki 0 min hi dikhe
             if (timerDisplay) timerDisplay.textContent = "0 min";
             if (statHours) statHours.textContent = "0 min";
             if (statAttBadge) statAttBadge.textContent = "Offline";
             if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-gray-400";
-        } 
-        else if (!todayAttendance.punch_out) {
+        } else if (!todayAttendance.punch_out) {
             if (btn) {
                 btn.textContent = "Check out";
                 btn.disabled = false;
@@ -219,14 +214,14 @@ async function loadTodayAttendance() {
             if (!punchInStr.endsWith("Z") && !punchInStr.includes("+") && !punchInStr.includes("gmt")) {
                 punchInStr += "Z";
             }
-const punchIn = new Date(punchInStr);
+            const punchIn = new Date(punchInStr);
 
             const updateClock = () => {
                 const diffMs = Math.max(0, Date.now() - punchIn.getTime());
                 const totalMins = Math.floor(diffMs / 60000);
                 const hh = Math.floor(totalMins / 60);
                 const mm = totalMins % 60;
-                
+
                 const liveStr = hh > 0 ? `${hh}h ${mm}m` : `${mm} min`;
 
                 if (timerDisplay) timerDisplay.textContent = liveStr;
@@ -235,16 +230,15 @@ const punchIn = new Date(punchInStr);
             };
 
             updateClock();
-            shiftTimerInterval = setInterval(updateClock, 1000); // 1-second live tick
-        } 
-        else {
+            shiftTimerInterval = setInterval(updateClock, 1000);
+        } else {
             if (btn) {
                 btn.textContent = "Shift Completed";
                 btn.disabled = true;
                 btn.className = "btn wide opacity-60 cursor-not-allowed";
             }
             if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-gray-400";
-            
+
             const formattedTotal = formatDuration(todayAttendance.total_hours);
             if (timerDisplay) timerDisplay.textContent = formattedTotal;
             if (statusLabel) statusLabel.textContent = todayAttendance.status || "Completed";
@@ -253,7 +247,6 @@ const punchIn = new Date(punchInStr);
         }
     } catch (e) {
         console.error("Attendance API Error:", e);
-        // SAFETY FALLBACK: Agar API fail ho ya error aaye, tab bhi hardcoded 5h 30m hata kar 0 min kar do
         if (timerDisplay) timerDisplay.textContent = "0 min";
         if (statHours) statHours.textContent = "0 min";
         if (statusLabel) statusLabel.textContent = "Not checked in";
@@ -266,7 +259,7 @@ const punchIn = new Date(punchInStr);
 
 async function handlePunchToggle() {
     try {
-        if (!todayAttendance) {
+        if (!todayAttendance || !todayAttendance.punch_in) {
             await apiRequest("/attendance/punch-in", "POST", { notes: "Checked in via Zenwork" });
         } else if (!todayAttendance.punch_out) {
             await apiRequest("/attendance/punch-out", "POST", { notes: "Checked out via Zenwork" });
@@ -301,6 +294,7 @@ async function loadAnnouncements() {
         `).join("");
     } catch (e) {}
 }
+
 async function loadPerformanceStats() {
     try {
         const perf = await apiRequest("/analytics/scorecard");
@@ -351,7 +345,7 @@ function drawMiniCalendar() {
 
     document.getElementById("miniCalMonth").textContent =
         now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
-    const offset = (new Date(now.getFullYear(), now.getMonth(), 1).getDay() + 6) % 7;  // Monday-first
+    const offset = (new Date(now.getFullYear(), now.getMonth(), 1).getDay() + 6) % 7;
     let html = "<span></span>".repeat(offset);
     for (let d = 1; d <= totalDays; d++) {
         if (d === today) {
@@ -391,8 +385,24 @@ document.getElementById("createTaskForm").addEventListener("submit", async (e) =
     }
 });
 
-// 6. SIDEBAR NAVIGATION ROUTER (Switches between tabs)
+// 6. MOBILE DRAWER & SIDEBAR NAVIGATION ROUTER
+function toggleMobileSidebar(forceState) {
+    const sidebar = document.getElementById("appSidebar");
+    const backdrop = document.getElementById("mobileSidebarBackdrop");
+    if (!sidebar || !backdrop) return;
+
+    const shouldOpen = typeof forceState === "boolean"
+        ? forceState
+        : !sidebar.classList.contains("is-mobile-open");
+
+    sidebar.classList.toggle("is-mobile-open", shouldOpen);
+    backdrop.classList.toggle("hidden", !shouldOpen);
+}
+
 function switchSection(sectionName) {
+    // Auto-close mobile drawer when any section is chosen
+    toggleMobileSidebar(false);
+
     // Highlight selected sidebar button
     document.querySelectorAll(".nav-item").forEach(btn => {
         btn.classList.remove("is-active");
@@ -422,22 +432,18 @@ function switchSection(sectionName) {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
         renderAdminSection();
-    
     } else if (sectionName === "profile") {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
-        renderProfileSection();    
-
+        renderProfileSection();
     } else if (sectionName === "settings") {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
         renderSettingsSection();
-
     } else if (typeof SECTION_RENDERERS !== "undefined" && SECTION_RENDERERS[sectionName]) {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
         SECTION_RENDERERS[sectionName]();
-
     } else {
         dashView.classList.add("hidden");
         dynView.classList.remove("hidden");
@@ -448,7 +454,6 @@ function switchSection(sectionName) {
             </div>`;
     }
 }
-
 
 document.addEventListener("DOMContentLoaded", () => {
   const helpBtn = document.querySelector('.topbar-right button[title="Help"]');
@@ -577,7 +582,7 @@ function formatDuration(totalHours) {
 
 document.addEventListener("keydown", (e) => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-    e.preventDefault(); // Browser ke URL bar focus ko rokein
+    e.preventDefault();
     const searchInput = document.querySelector("input[placeholder*='Search']");
     if (searchInput) searchInput.focus();
   }

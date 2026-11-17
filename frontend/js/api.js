@@ -58,3 +58,16 @@ async function apiRequest(endpoint, method = "GET", body = null, isFormData = fa
         throw error;
     }
 }
+
+
+async function fetchWithRetry(url, options, retries = 1) {
+    try {
+        return await fetch(url, options);
+    } catch (err) {
+        if (retries > 0 && err.name === "TypeError") {
+            await new Promise(r => setTimeout(r, 600));
+            return fetchWithRetry(url, options, retries - 1);
+        }
+        throw err;
+    }
+}

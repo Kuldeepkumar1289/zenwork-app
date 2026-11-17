@@ -12,10 +12,13 @@ def sync_user_quotas(user: User, db: Session):
     now = datetime.now()
     current_ym = now.strftime("%Y-%m")
 
+    if user.leave_balance is None:
+        user.leave_balance = 2.0
+    if user.wfh_balance is None:
+        user.wfh_balance = 2.0
+
     if not user.last_quota_sync:
         user.last_quota_sync = current_ym
-        user.leave_balance = 2.0
-        user.wfh_balance = 2.0
         db.commit()
         return
 
@@ -23,8 +26,8 @@ def sync_user_quotas(user: User, db: Session):
         last_y, last_m = map(int, user.last_quota_sync.split("-"))
         months_elapsed = (now.year - last_y) * 12 + (now.month - last_m)
         if months_elapsed > 0:
-            user.leave_balance = round(user.leave_balance + (months_elapsed * 2.0), 1)
-            user.wfh_balance = 2.0  # Refreshes to 2 every month (does not accumulate)
+            user.leave_balance = round((user.leave_balance or 0.0) + (months_elapsed * 2.0), 1)
+            user.wfh_balance = 2.0
             user.last_quota_sync = current_ym
             db.commit()
 

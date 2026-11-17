@@ -19,6 +19,9 @@ from src.events import models as event_models
 from src.events.router import router as events_router
 from fastapi.responses import JSONResponse
 from fastapi import Request
+import src.user.models
+import src.tasks.models
+import src.attendance.models
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)

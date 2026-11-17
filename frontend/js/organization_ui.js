@@ -9,6 +9,27 @@ async function renderOrganizationSection() {
   ]);
   cachedOrgRoots = Array.isArray(tree) ? tree : [];
   cachedLiveStatus = liveStatuses || {};
+
+  // Sync current logged-in user's live shift status immediately
+  if (typeof currentUser !== "undefined" && currentUser && typeof todayAttendance !== "undefined" && todayAttendance) {
+    const uid = String(currentUser.id);
+    if (todayAttendance.punch_in && !todayAttendance.punch_out) {
+      cachedLiveStatus[uid] = {
+        ...(cachedLiveStatus[uid] || {}),
+        state: "CHECKED_IN",
+        label: "Checked in",
+        punch_in: todayAttendance.punch_in
+      };
+    } else if (todayAttendance.punch_out) {
+      cachedLiveStatus[uid] = {
+        ...(cachedLiveStatus[uid] || {}),
+        state: "CHECKED_OUT",
+        label: `Checked out (${todayAttendance.total_hours || 0}h)`,
+        punch_in: todayAttendance.punch_in
+      };
+    }
+  }
+
   drawOrganization();
 }
 
@@ -56,9 +77,10 @@ function drawOrganization() {
   const people = flattenOrgTree(roots);
   const countRole = role => people.filter(p => p.role_tier === role).length;
 
-  const checkedInCount = people.filter(p => (cachedLiveStatus[p.id]?.state === "CHECKED_IN")).length;
-  const wfhOrLeaveCount = people.filter(p => ["WFH", "ON_LEAVE"].includes(cachedLiveStatus[p.id]?.state)).length;
-
+  const getSt = (id) => cachedLiveStatus[id] || cachedLiveStatus[String(id)] || { state: "NOT_CHECKED_IN" };
+  const checkedInCount = people.filter(p => getSt(p.id).state === "CHECKED_IN").length;
+  const wfhOrLeaveCount = people.filter(p => ["WFH", "ON_LEAVE"].includes(getSt(p.id).state)).length;
+  
   // Build parent lookup map so every person shows their exact reporting line
   const managerOf = {};
   const mapReports = (nodes, managerName = "Top-Level Leadership") => {

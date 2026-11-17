@@ -4,6 +4,8 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status, Request
 from math import radians, sin, cos, sqrt, atan2
 from calendar import monthrange
+from sqlalchemy import func, or_
+
 
 from src.attendance.models import (
     Attendance,
@@ -344,18 +346,40 @@ def get_my_monthly_attendance(month_str: Optional[str], current_user: User, db: 
 
 
 def get_company_live_statuses(current_user: User, db: Session):
-    """Returns today's live status (CHECKED_IN, CHECKED_OUT, WFH, ON_LEAVE, NOT_CHECKED_IN) for every teammate in the same company."""
+    """Returns today's live status for every teammate in the same company (handles NULL/case company_name and active shifts)."""
     today = get_utc_now().date()
-    company_users = db.query(User).filter(User.company_name == current_user.company_name).all()
-    user_ids = [u.id for u in company_users]
+    yesterday = today - timedelta(days=1)
 
-    todays_att = {
-        a.user_id: a
-        for a in db.query(Attendance).filter(
-            Attendance.user_id.in_(user_ids),
-            Attendance.date == today
+    user_company = (current_user.company_name or "").strip().lower()
+    if user_company:
+        company_users = db.query(User).filter(
+            or_(
+                func.lower(func.trim(User.company_name)) == user_company,
+                User.company_name.is_(None),
+                User.company_name == ""
+            )
         ).all()
-    }
+    else:
+        company_users = db.query(User).all()
+
+    user_ids = [u.id for u in company_users]
+    if not user_ids:
+        return {}
+
+    # Fetch today's attendance OR any currently open active shift
+    att_rows = db.query(Attendance).filter(
+        Attendance.user_id.in_(user_ids),
+        or_(
+            Attendance.date == today,
+            Attendance.punch_out.is_(None)
+        )
+    ).order_by(Attendance.id.asc()).all()
+
+    todays_att = {}
+    for a in att_rows:
+        # Prefer today's record or an open active shift
+        if a.date == today or a.punch_out is None:
+            todays_att[a.user_id] = a
 
     approved_leaves = db.query(LeaveRequest).filter(
         LeaveRequest.user_id.in_(user_ids),
@@ -371,14 +395,14 @@ def get_company_live_statuses(current_user: User, db: Session):
         lv = leave_map.get(u.id)
 
         if att and att.punch_in and not att.punch_out:
-            status_map[u.id] = {
+            status_map[str(u.id)] = {
                 "state": "CHECKED_IN",
                 "label": "Checked in",
                 "punch_in": att.punch_in.isoformat(),
                 "mode": "WFH" if (lv and lv.leave_type == LeaveType.WFH) else "Office"
             }
-        elif att and att.punch_out:
-            status_map[u.id] = {
+        elif att and att.punch_out and att.date == today:
+            status_map[str(u.id)] = {
                 "state": "CHECKED_OUT",
                 "label": f"Checked out ({att.total_hours}h)",
                 "punch_in": att.punch_in.isoformat() if att.punch_in else None,
@@ -386,10 +410,10 @@ def get_company_live_statuses(current_user: User, db: Session):
             }
         elif lv:
             if lv.leave_type == LeaveType.WFH:
-                status_map[u.id] = {"state": "WFH", "label": "Work From Home", "punch_in": None, "mode": "WFH"}
+                status_map[str(u.id)] = {"state": "WFH", "label": "Work From Home", "punch_in": None, "mode": "WFH"}
             else:
-                status_map[u.id] = {"state": "ON_LEAVE", "label": f"On Leave ({lv.leave_type.value})", "punch_in": None, "mode": "Leave"}
+                status_map[str(u.id)] = {"state": "ON_LEAVE", "label": f"On Leave ({lv.leave_type.value})", "punch_in": None, "mode": "Leave"}
         else:
-            status_map[u.id] = {"state": "NOT_CHECKED_IN", "label": "Not checked in", "punch_in": None, "mode": "Offline"}
+            status_map[str(u.id)] = {"state": "NOT_CHECKED_IN", "label": "Not checked in", "punch_in": None, "mode": "Offline"}
 
     return status_map

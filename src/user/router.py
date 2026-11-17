@@ -1,26 +1,31 @@
-from fastapi import APIRouter, Depends, status, HTTPException
-from sqlalchemy.orm import Session
-from sqlalchemy import text
 from typing import List
-from fastapi.security import OAuth2PasswordRequestForm
-from pydantic import BaseModel, Field
-from passlib.context import CryptContext
 
-from src.utils.db import get_db, engine
-from src.utils.dependencies import get_current_user
-from src.user.models import User, RoleTier
-from src.user.dtos import (
-    UserRegister,
-    UserLogin,
-    UserResponse,
-    TokenResponse,
-    OrgNodeResponse
-)
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
+from sqlalchemy import text
+from sqlalchemy.orm import Session
+
 from src.user.controller import (
-    register_user,
     authenticate_user,
-    build_org_tree
+    build_org_tree,
+    change_user_password,
+    complete_password_reset_with_otp,
+    initiate_password_reset_otp,
+    register_user
 )
+from src.user.dtos import (
+    ChangePasswordRequest,
+    OrgNodeResponse,
+    SendOtpRequest,
+    TokenResponse,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+    VerifyOtpResetRequest
+)
+from src.user.models import RoleTier, User
+from src.utils.db import engine, get_db
+from src.utils.dependencies import get_current_user
 
 # Safe one-time schema check so TiDB Cloud adds company_name automatically if missing
 try:
@@ -42,19 +47,6 @@ def register(data: UserRegister, db: Session = Depends(get_db)):
             detail="Admin role is granted automatically when creating a new company workspace."
         )
     return register_user(data=data, db=db)
-
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-class ChangePasswordRequest(BaseModel):
-    current_password: str
-    new_password: str = Field(..., min_length=6)
-
-
-class ForgotPasswordRequest(BaseModel):
-    email: str
-    new_password: str = Field(..., min_length=6)
 
 
 @user_router.post("/login", response_model=TokenResponse, summary="Authenticate a user and generate an access token")
@@ -86,27 +78,20 @@ def change_password(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    if not pwd_context.verify(data.current_password, current_user.hashed_password):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect."
-        )
-    current_user.hashed_password = pwd_context.hash(data.new_password)
-    db.commit()
-    return {"message": "Password verified and updated successfully!"}
+    return change_user_password(data=data, current_user=current_user, db=db)
 
 
-@user_router.post("/forgot-password", summary="Reset forgotten password via registered work email")
-def forgot_password(
-    data: ForgotPasswordRequest,
+@user_router.post("/forgot-password/send-otp", summary="Send 6-digit OTP to registered work email")
+def send_password_reset_otp(
+    data: SendOtpRequest,
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == data.email.lower().strip()).first()
-    if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No workspace account found with this email."
-        )
-    user.hashed_password = pwd_context.hash(data.new_password)
-    db.commit()
-    return {"message": "Password reset successful! You can now sign in with your new password."}
+    return initiate_password_reset_otp(data=data, db=db)
+
+
+@user_router.post("/forgot-password/verify-reset", summary="Verify email OTP and set a new password")
+def verify_otp_and_reset_password(
+    data: VerifyOtpResetRequest,
+    db: Session = Depends(get_db)
+):
+    return complete_password_reset_with_otp(data=data, db=db)

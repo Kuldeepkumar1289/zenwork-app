@@ -145,26 +145,39 @@
         </button>
       </form>
 
-      <!-- 2. INLINE FORGOT PASSWORD FORM -->
+      <!-- 2. TWO-STEP EMAIL OTP FORGOT PASSWORD FORM -->
       <form id="forgotForm" class="hidden space-y-3.5">
         <div>
           <label class="block text-xs font-semibold mb-1.5">Registered Work Email</label>
-          <input type="email" id="forgotEmail" required placeholder="kuldeep@zenwork.com" class="day-input">
+          <div class="flex gap-2">
+            <input type="email" id="forgotEmail" required placeholder="kuldeep@zenwork.com" class="day-input">
+            <button type="button" id="sendOtpBtn" onclick="requestResetOtp()" class="btn btn-ghost whitespace-nowrap" style="padding: 0 14px;">
+              Send OTP
+            </button>
+          </div>
         </div>
-        <div>
-          <label class="block text-xs font-semibold mb-1.5">New Password (min 6 chars)</label>
-          <input type="password" id="forgotNewPassword" required minlength="6" placeholder="••••••••" class="day-input">
+
+        <div id="otpVerifyFields" class="hidden space-y-3.5 pt-1">
+          <div>
+            <label class="block text-xs font-semibold mb-1.5">6-Digit Email OTP</label>
+            <input type="text" id="forgotOtp" maxlength="6" pattern="\d{6}" placeholder="Enter 6-digit OTP" class="day-input" style="letter-spacing: 3px; font-weight: 700;">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1.5">New Password (min 6 chars)</label>
+            <input type="password" id="forgotNewPassword" minlength="6" placeholder="••••••••" class="day-input">
+          </div>
         </div>
+
         <div class="flex gap-2 pt-2">
           <button type="button" onclick="toggleForgotPanel(false)" class="btn btn-ghost" style="width: 35%;">
             Back
           </button>
-          <button type="submit" id="forgotSubmitBtn" class="btn btn-primary" style="width: 65%;">
-            Reset password
+          <button type="submit" id="forgotSubmitBtn" disabled class="btn btn-primary opacity-60 cursor-not-allowed" style="width: 65%;">
+            Verify OTP &amp; Reset
           </button>
         </div>
       </form>
-
+      
       <!-- 3. MULTI-COMPANY SIGN UP FORM -->
       <form id="registerForm" class="hidden space-y-3.5">
         <div>

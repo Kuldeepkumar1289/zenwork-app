@@ -1,13 +1,67 @@
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+import os
+import random
+import smtplib
+from datetime import datetime, timedelta, timezone
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from fastapi import HTTPException, status
-from src.user.models import User, RoleTier
-from src.user.dtos import UserRegister, UserLogin
-from src.utils.security import hash_password, verify_password, create_access_token
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from src.user.dtos import (
+    ChangePasswordRequest,
+    SendOtpRequest,
+    UserLogin,
+    UserRegister,
+    VerifyOtpResetRequest
+)
+from src.user.models import RoleTier, User
+from src.utils.security import create_access_token, hash_password, verify_password
+
+# In-memory OTP store: { email: {"otp": "123456", "expires_at": datetime} }
+PASSWORD_RESET_OTPS = {}
+
+
+def _send_otp_email(to_email: str, full_name: str, otp_code: str) -> bool:
+    """Sends a 6-digit OTP email via SMTP if configured in environment variables."""
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_user = os.getenv("SMTP_USER", "")
+    smtp_pass = os.getenv("SMTP_PASS", "")
+
+    if not smtp_user or not smtp_pass:
+        return False
+
+    msg = MIMEMultipart("alternative")
+    msg["Subject"] = f"Zenwork Password Reset OTP: {otp_code}"
+    msg["From"] = f"Zenwork Security <{smtp_user}>"
+    msg["To"] = to_email
+
+    html_body = f"""
+    <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;">
+      <h2 style="color:#1d6b52;margin-top:0;">Zenwork Workspace Security</h2>
+      <p>Hi <b>{full_name}</b>,</p>
+      <p>Use the following 6-digit One-Time Password (OTP) to reset your Zenwork account password. It expires in <b>10 minutes</b>:</p>
+      <div style="font-size:28px;font-weight:800;letter-spacing:6px;background:#f0fdf4;color:#166534;padding:14px 20px;border-radius:12px;text-align:center;margin:18px 0;">
+        {otp_code}
+      </div>
+      <p style="font-size:12px;color:#64748b;">If you did not request this password reset, you can safely ignore this email.</p>
+    </div>
+    """
+    msg.attach(MIMEText(html_body, "html"))
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as server:
+        server.starttls()
+        server.login(smtp_user, smtp_pass)
+        server.sendmail(smtp_user, to_email, msg.as_string())
+    return True
+
 
 def register_user(data: UserRegister, db: Session) -> User:
     """Register a new user or create a new company workspace."""
-    existing_user = db.query(User).filter(User.email == data.email.lower().strip()).first()
+    clean_email = data.email.lower().strip()
+    existing_user = db.query(User).filter(User.email == clean_email).first()
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -61,7 +115,7 @@ def register_user(data: UserRegister, db: Session) -> User:
     new_user = User(
         company_name=canonical_company,
         full_name=data.full_name.strip(),
-        email=data.email.lower().strip(),
+        email=clean_email,
         hashed_password=hash_password(data.password),
         role_tier=assigned_role,
         designation=data.designation.strip() or "Team Member",
@@ -74,7 +128,7 @@ def register_user(data: UserRegister, db: Session) -> User:
 
 
 def authenticate_user(data: UserLogin, db: Session):
-    """Authenticate a user and generate an access token."""
+    """Authenticate a user and generate a JWT access token."""
     user = db.query(User).filter(User.email == data.email.lower().strip()).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(
@@ -101,3 +155,84 @@ def build_org_tree(user: User):
             if sub.company_name == user.company_name
         ]
     }
+
+
+def change_user_password(data: ChangePasswordRequest, current_user: User, db: Session):
+    """Verify current password and update to a new password."""
+    if not verify_password(data.current_password, current_user.hashed_password):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect."
+        )
+    current_user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    return {"message": "Password verified and updated successfully!"}
+
+
+def initiate_password_reset_otp(data: SendOtpRequest, db: Session):
+    """Generate a 6-digit OTP and send it to the user's registered email."""
+    clean_email = data.email.lower().strip()
+    user = db.query(User).filter(User.email == clean_email).first()
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="No workspace account found with this email."
+        )
+
+    otp_code = f"{random.randint(100000, 999999)}"
+    PASSWORD_RESET_OTPS[clean_email] = {
+        "otp": otp_code,
+        "expires_at": datetime.now(timezone.utc) + timedelta(minutes=10)
+    }
+
+    try:
+        sent = _send_otp_email(clean_email, user.full_name, otp_code)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to send OTP email: {str(e)}"
+        )
+
+    if sent:
+        return {"message": f"A 6-digit verification OTP has been sent to {clean_email}.", "email_sent": True}
+
+    return {
+        "message": f"SMTP not configured yet. Your verification OTP is: {otp_code}",
+        "email_sent": False,
+        "demo_otp": otp_code
+    }
+
+
+def complete_password_reset_with_otp(data: VerifyOtpResetRequest, db: Session):
+    """Verify the 6-digit OTP and reset the user's password."""
+    clean_email = data.email.lower().strip()
+    record = PASSWORD_RESET_OTPS.get(clean_email)
+
+    if not record:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Please request an OTP first."
+        )
+
+    if datetime.now(timezone.utc) > record["expires_at"]:
+        PASSWORD_RESET_OTPS.pop(clean_email, None)
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired. Please request a new one."
+        )
+
+    if record["otp"] != data.otp.strip():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid 6-digit OTP. Please check and try again."
+        )
+
+    user = db.query(User).filter(User.email == clean_email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
+
+    user.hashed_password = hash_password(data.new_password)
+    db.commit()
+    PASSWORD_RESET_OTPS.pop(clean_email, None)
+
+    return {"message": "OTP verified! Password updated successfully. Please sign in."}

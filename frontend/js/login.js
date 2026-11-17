@@ -69,11 +69,57 @@ function toggleForgotPanel(showForgot) {
   document.getElementById("loginForm").classList.toggle("hidden", showForgot);
   document.getElementById("forgotForm").classList.toggle("hidden", !showForgot);
 
+  // Reset OTP step state whenever opened
+  const otpFields = document.getElementById("otpVerifyFields");
+  const submitBtn = document.getElementById("forgotSubmitBtn");
+  const emailInput = document.getElementById("forgotEmail");
+  const sendBtn = document.getElementById("sendOtpBtn");
+  if (otpFields) otpFields.classList.add("hidden");
+  if (emailInput) emailInput.readOnly = false;
+  if (sendBtn) sendBtn.textContent = "Send OTP";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add("opacity-60", "cursor-not-allowed");
+  }
+
   document.getElementById("formHeading").textContent =
     showForgot ? "Reset password" : "Welcome back";
   document.getElementById("formSubheading").textContent =
-    showForgot ? "Enter your registered work email to set a new password."
+    showForgot ? "Verify your registered work email with a 6-digit OTP."
                : "Sign in to access your tasks, attendance, and team workspace.";
+}
+
+/* Step 1: Request 6-Digit Email OTP */
+async function requestResetOtp() {
+  const email = document.getElementById("forgotEmail").value.trim();
+  if (!email) {
+    showAlert("Please enter your registered work email first.", true);
+    return;
+  }
+
+  const sendBtn = document.getElementById("sendOtpBtn");
+  sendBtn.disabled = true;
+  sendBtn.textContent = "Sending...";
+
+  try {
+    const res = await apiRequest("/users/forgot-password/send-otp", "POST", { email });
+    showAlert(res.message, false);
+
+    document.getElementById("forgotEmail").readOnly = true;
+    document.getElementById("otpVerifyFields").classList.remove("hidden");
+    document.getElementById("forgotOtp").required = true;
+    document.getElementById("forgotNewPassword").required = true;
+
+    const submitBtn = document.getElementById("forgotSubmitBtn");
+    submitBtn.disabled = false;
+    submitBtn.classList.remove("opacity-60", "cursor-not-allowed");
+    sendBtn.textContent = "Resend OTP";
+  } catch (err) {
+    showAlert(err.message, true);
+    sendBtn.textContent = "Send OTP";
+  } finally {
+    sendBtn.disabled = false;
+  }
 }
 
 /* Sign In */
@@ -108,25 +154,32 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 
-/* Inline Forgot Password */
+/* Step 2: Verify OTP & Reset Password */
 document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("forgotSubmitBtn");
   btn.disabled = true;
-  btn.textContent = "Resetting...";
+  btn.textContent = "Verifying OTP...";
 
   try {
     const email = document.getElementById("forgotEmail").value.trim();
+    const otp = document.getElementById("forgotOtp").value.trim();
     const new_password = document.getElementById("forgotNewPassword").value;
-    const res = await apiRequest("/users/forgot-password", "POST", { email, new_password });
+
+    const res = await apiRequest("/users/forgot-password/verify-reset", "POST", {
+      email,
+      otp,
+      new_password
+    });
+
     showAlert(res.message, false);
     document.getElementById("forgotForm").reset();
-    setTimeout(() => toggleForgotPanel(false), 1400);
+    setTimeout(() => toggleForgotPanel(false), 1500);
   } catch (err) {
     showAlert(err.message, true);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Reset password";
+    btn.textContent = "Verify OTP & Reset";
   }
 });
 

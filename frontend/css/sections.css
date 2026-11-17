@@ -294,8 +294,7 @@ body.is-night #heroSubtitle {
   text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
 }
 
-/* NIGHT THEME VISIBILITY FOR ALL PAGE HEADERS & SUBTITLES
-   Covers Chats, Tasks, Events, Calendar, Voice, Org, Attendance & Performance */
+
 
 /* 1. Every page's main H1 title & subtitle (<p> right after H1) in crisp white at night */
 body.is-night main h1,

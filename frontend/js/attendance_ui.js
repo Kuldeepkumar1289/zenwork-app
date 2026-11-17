@@ -243,7 +243,7 @@ async function renderAttendanceSection() {
     ]);
 }
 
-/* ---------- Monthly Daily Work Log ---------- */
+/*  Monthly Daily Work Log  */
 async function loadMonthlyAttendanceHistory(monthStr) {
     const tbody = document.getElementById("monthlyHistoryBody");
     const subEl = document.getElementById("monthlySummarySub");
@@ -468,7 +468,7 @@ async function reviewLeaveAction(requestId, status) {
     }
 }
 
-/* ---------- Attendance Regularization Handlers ---------- */
+/*  Attendance Regularization Handlers  */
 function openRegModal() {
     const todayLocal = new Date();
     const yyyy = todayLocal.getFullYear();

@@ -2,6 +2,50 @@ let currentUser = null;
 let allTasks = [];
 let todayAttendance = null;
 
+// Clean production toast notification (replaces raw browser alert popups)
+function showToast(message, type = "info") {
+    const existing = document.getElementById("zenToast");
+    if (existing) existing.remove();
+
+    const colors = {
+        success: { bg: "#ECFDF5", border: "#A7F3D0", text: "#065F46", icon: "✓" },
+        error:   { bg: "#FEF2F2", border: "#FECACA", text: "#991B1B", icon: "!" },
+        info:    { bg: "#F8FAFC", border: "#CBD5E1", text: "#0F172A", icon: "•" }
+    };
+    const theme = colors[type] || colors.info;
+
+    const toast = document.createElement("div");
+    toast.id = "zenToast";
+    toast.style.cssText = `
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        max-width: 340px;
+        background: ${theme.bg};
+        color: ${theme.text};
+        border: 1px solid ${theme.border};
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-size: 13px;
+        font-weight: 600;
+        box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        z-index: 10000;
+        transition: opacity 0.25s ease;
+    `;
+    toast.innerHTML = `
+        <span style="width:20px;height:20px;border-radius:999px;background:${theme.text};color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0;">${theme.icon}</span>
+        <span>${message}</span>
+    `;
+    document.body.appendChild(toast);
+    setTimeout(() => {
+        toast.style.opacity = "0";
+        setTimeout(() => toast.remove(), 260);
+    }, 3400);
+}
+
 // 1. APP STARTUP: Runs automatically when index.html opens
 document.addEventListener("DOMContentLoaded", async () => {
     if (!getAuthToken()) {
@@ -42,14 +86,18 @@ function setTodayDate() {
     }
 }
 
-// Updates user name, designation, and shows Admin tab if user is ADMIN
+// Updates user name, company workspace name, designation, and shows Admin tab if user is ADMIN
 function updateProfileUI(user) {
+    if (!user) return;
     const firstName = user.full_name.split(" ")[0];
     const hr = new Date().getHours();
     const hello = hr < 12 ? "Good morning" : hr < 17 ? "Good afternoon" : hr < 20 ? "Good evening" : "Good night";
 
     const greetEl = document.getElementById("heroGreeting") || document.getElementById("greetingText");
     if (greetEl) greetEl.textContent = `${hello}, ${firstName}`;
+
+    const compEl = document.getElementById("sidebarCompanyName");
+    if (compEl) compEl.textContent = user.company_name || "Zenwork Workspace";
 
     document.getElementById("topUserName").textContent = user.full_name;
     document.getElementById("topUserRole").textContent = user.designation;
@@ -90,7 +138,7 @@ async function loadTasks() {
     } catch (err) {
         const tbody = document.getElementById("dashboardTasksBody");
         if (tbody) {
-            tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-red-500">Could not load tasks</td></tr>`;
+            tbody.innerHTML = `<tr><td colspan="5" class="py-4 text-center text-red-500">Unable to load tasks right now.</td></tr>`;
         }
     }
 }
@@ -100,7 +148,7 @@ function renderTasksTable(tasksList) {
     if (!tbody) return;
 
     if (!tasksList.length) {
-        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-400">No tasks found. Click "+ Create new" to add one.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="py-6 text-center text-gray-400">No tasks assigned yet. Create a task to get started.</td></tr>`;
         return;
     }
 
@@ -168,14 +216,29 @@ function handleSearchFilter(query) {
 async function markTaskDone(taskId) {
     try {
         await apiRequest(`/tasks/${taskId}/status`, "PATCH", { status: "COMPLETED" });
+        showToast("Task marked as completed.", "success");
         await loadTasks();
     } catch (err) {
-        alert(err.message);
+        showToast(err.message || "Could not update task.", "error");
     }
 }
 
-// 3. ATTENDANCE & SHIFT TIMER
+// 3. ATTENDANCE & SHIFT TIMER (Synced across Desktop Rail + Mobile Quick Bar)
 let shiftTimerInterval = null;
+
+function syncMobileAttendanceUI({ btnText, btnDisabled, statusText, timerText }) {
+    const mBtn = document.getElementById("mobileCheckInBtn");
+    const mStatus = document.getElementById("mobileShiftStatus");
+    const mTimer = document.getElementById("mobileShiftTimer");
+
+    if (mBtn && btnText !== undefined) {
+        mBtn.textContent = btnText;
+        mBtn.disabled = !!btnDisabled;
+        mBtn.style.opacity = btnDisabled ? "0.6" : "1";
+    }
+    if (mStatus && statusText !== undefined) mStatus.textContent = statusText;
+    if (mTimer && timerText !== undefined) mTimer.textContent = timerText;
+}
 
 async function loadTodayAttendance() {
     const timerDisplay = document.getElementById("shiftTimerDisplay");
@@ -201,10 +264,18 @@ async function loadTodayAttendance() {
             if (statHours) statHours.textContent = "0 min";
             if (statAttBadge) statAttBadge.textContent = "Offline";
             if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-gray-400";
+
+            syncMobileAttendanceUI({
+                btnText: "Check in",
+                btnDisabled: false,
+                statusText: "Not checked in",
+                timerText: "0 min"
+            });
         } else if (!todayAttendance.punch_out) {
             if (btn) {
                 btn.textContent = "Check out";
                 btn.disabled = false;
+                btn.className = "btn wide btn-primary";
             }
             if (statusLabel) statusLabel.textContent = "Checked in";
             if (pulseDot) pulseDot.className = "w-1.5 h-1.5 rounded-full bg-[#1E6B52] animate-pulse";
@@ -226,6 +297,13 @@ async function loadTodayAttendance() {
                 if (timerDisplay) timerDisplay.textContent = liveStr;
                 if (statHours) statHours.textContent = liveStr;
                 if (statAttBadge) statAttBadge.textContent = "Active";
+
+                syncMobileAttendanceUI({
+                    btnText: "Check out",
+                    btnDisabled: false,
+                    statusText: "Checked in • Live",
+                    timerText: liveStr
+                });
             };
 
             updateClock();
@@ -243,6 +321,13 @@ async function loadTodayAttendance() {
             if (statusLabel) statusLabel.textContent = todayAttendance.status || "Completed";
             if (statHours) statHours.textContent = formattedTotal;
             if (statAttBadge) statAttBadge.textContent = todayAttendance.status || "Completed";
+
+            syncMobileAttendanceUI({
+                btnText: "Completed",
+                btnDisabled: true,
+                statusText: todayAttendance.status || "Shift completed",
+                timerText: formattedTotal
+            });
         }
     } catch (e) {
         console.error("Attendance API Error:", e);
@@ -253,19 +338,34 @@ async function loadTodayAttendance() {
             btn.textContent = "Check in";
             btn.disabled = false;
         }
+        syncMobileAttendanceUI({
+            btnText: "Check in",
+            btnDisabled: false,
+            statusText: "Not checked in",
+            timerText: "0 min"
+        });
     }
 }
 
 async function handlePunchToggle() {
+    const desktopBtn = document.getElementById("punchActionBtn");
+    const mobileBtn = document.getElementById("mobileCheckInBtn");
+    if (desktopBtn) desktopBtn.disabled = true;
+    if (mobileBtn) mobileBtn.disabled = true;
+
     try {
         if (!todayAttendance || !todayAttendance.punch_in) {
             await apiRequest("/attendance/punch-in", "POST", { notes: "Checked in via Zenwork" });
+            showToast("Checked in! Your work session timer has started.", "success");
         } else if (!todayAttendance.punch_out) {
             await apiRequest("/attendance/punch-out", "POST", { notes: "Checked out via Zenwork" });
+            showToast("Checked out! Today's work hours have been logged.", "success");
         }
         await loadTodayAttendance();
     } catch (err) {
-        alert(err.message);
+        showToast(err.message || "Unable to update attendance right now.", "error");
+        if (desktopBtn) desktopBtn.disabled = false;
+        if (mobileBtn) mobileBtn.disabled = false;
     }
 }
 
@@ -378,9 +478,10 @@ document.getElementById("createTaskForm").addEventListener("submit", async (e) =
         await apiRequest("/tasks/", "POST", payload);
         closeTaskModal();
         document.getElementById("createTaskForm").reset();
+        showToast("Task assigned successfully.", "success");
         await loadTasks();
     } catch (err) {
-        alert("Error: " + err.message);
+        showToast(err.message || "Failed to assign task.", "error");
     }
 });
 
@@ -447,13 +548,12 @@ function switchSection(sectionName) {
         dynView.innerHTML = `
             <div class="bg-white p-6 rounded-2xl border border-[#E6ECE8]">
                 <h2 class="text-lg font-semibold text-gray-900 capitalize">${sectionName} Workspace</h2>
-                <p class="text-xs text-gray-500 mt-1">Ready for Step 2 module connection.</p>
+                <p class="text-xs text-gray-500 mt-1">Workspace module ready.</p>
             </div>`;
     }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const helpBtn = document.querySelector('.topbar-right button[title="Help"]');
   const notifBtn = document.querySelector('.topbar-right button[title="Notifications"]');
 
   function closeHeaderPopovers() {
@@ -468,6 +568,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     closeHeaderPopovers();
 
+    const isMobile = window.innerWidth <= 900;
     const rect = anchorEl.getBoundingClientRect();
     const box = document.createElement("div");
     box.id = "zenPopover";
@@ -555,23 +656,6 @@ document.addEventListener("DOMContentLoaded", () => {
         <button type="button" onclick="document.getElementById('zenPopover')?.remove(); switchSection('chats');"
           style="margin-top:8px;width:100%;padding:8px;border-radius:10px;background:var(--accent);color:#FFFFFF;font-size:12px;font-weight:600;cursor:pointer;">
           Open Chats
-        </button>
-      `);
-    });
-  }
-
-  if (helpBtn) {
-    helpBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      showHeaderPopover(helpBtn, "help", "Zenwork Quick Help", `
-        <div style="font-size:12px;color:#475569;line-height:1.65;">
-          <div><b>⌘K / Ctrl+K:</b> Jump to global search</div>
-          <div><b>Live Sky Arc:</b> Automatically synced with real-time clock across 12 day-to-night themes</div>
-          <div><b>Approvals:</b> Admins &amp; Managers can approve Leaves/WFH &amp; resolve Queries</div>
-        </div>
-        <button type="button" onclick="document.getElementById('zenPopover')?.remove(); switchSection('queries');"
-          style="margin-top:10px;width:100%;padding:8px;border-radius:10px;background:#F1F5F9;color:#0F172A;font-size:12px;font-weight:600;cursor:pointer;">
-          Raise a Support Query →
         </button>
       `);
     });

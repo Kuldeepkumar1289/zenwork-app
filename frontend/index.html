@@ -5,17 +5,16 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Zenwork — Workspace Dashboard</title>
 
-  <!-- Tailwind CSS for utility classes used inside dynamic JS tables -->
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%231d6b52'/><text x='50' y='68' font-size='56' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'>Z</text></svg>">
-  <!-- Core Daylight theme + styles for all 7 sub-pages -->
   <link rel="stylesheet" href="css/daylight.css">
   <link rel="stylesheet" href="css/sections.css">
 
   <style>
     .mobile-header,
-    .mobile-close-btn {
+    .mobile-close-btn,
+    .mobile-checkin-card {
       display: none;
     }
 
@@ -34,8 +33,21 @@
         width: 100%;
       }
 
+      .mobile-checkin-card {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 14px 16px;
+        margin-top: 12px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.72);
+        border: 1px solid rgba(15, 23, 42, 0.08);
+        backdrop-filter: blur(12px);
+      }
+
       .mobile-menu-toggle {
-        background: var(--accent, #4f46e5);
+        background: var(--accent, #1d6b52);
         color: var(--accent-ink, #ffffff);
         border: none;
         padding: 8px 14px;
@@ -91,7 +103,7 @@
 <body>
 <div class="app">
 
-  <!-- MOBILE TOP HEADER (Visible only on mobile <= 900px) -->
+  <!-- MOBILE TOP HEADER -->
   <div class="mobile-header">
     <div class="brand" style="margin:0;"><span class="brand-mark">z</span> zenwork</div>
     <button type="button" id="mobileMenuOpenBtn" class="mobile-menu-toggle" onclick="toggleMobileSidebar(true)">
@@ -102,16 +114,16 @@
   <!-- MOBILE BACKDROP OVERLAY -->
   <div id="mobileSidebarBackdrop" class="mobile-backdrop hidden" onclick="toggleMobileSidebar(false)"></div>
 
-  <!--  1. LEFT SIDEBAR  -->
+  <!-- 1. LEFT SIDEBAR -->
   <aside id="appSidebar" class="sidebar glass">
     <div class="brand" style="display:flex;align-items:center;justify-content:space-between;">
       <span><span class="brand-mark">z</span> zenwork</span>
       <button type="button" id="mobileMenuCloseBtn" class="mobile-close-btn" onclick="toggleMobileSidebar(false)">✕</button>
     </div>
 
-    <div class="workspace-chip">
-      <small>Acme Studio</small>
-      <b>Company workspace</b>
+    <div class="workspace" style="padding: 10px 12px; border-radius: 14px; background: rgba(255,255,255,0.45); border: 1px solid var(--line); margin-bottom: 10px;">
+      <div id="sidebarCompanyName" style="font-weight:700; font-size:0.9rem;">Your Workspace</div>
+      <div style="font-size:0.74rem; opacity:0.7;">Company workspace</div>
     </div>
 
     <nav class="nav">
@@ -127,7 +139,6 @@
       <button id="nav-tasks"        class="nav-item" onclick="switchSection('tasks')">Tasks</button>
       <button id="nav-organization" class="nav-item" onclick="switchSection('organization')">Organization</button>
 
-      <!-- Revealed automatically by dashboard.js when currentUser.role_tier === "ADMIN" -->
       <div id="adminNavSection" class="hidden">
         <p class="nav-group">Super admin</p>
         <button id="nav-admin" class="nav-item" onclick="switchSection('admin')">Admin Control</button>
@@ -147,7 +158,7 @@
     </div>
   </aside>
 
-  <!-- ============ 2. MAIN WORKSPACE ============ -->
+  <!-- 2. MAIN WORKSPACE -->
   <main class="main">
 
     <header class="topbar">
@@ -159,7 +170,6 @@
       </div>
 
       <div class="topbar-right">
-        <button class="icon-btn" title="Help">?</button>
         <button class="icon-btn" title="Notifications">🔔<i class="notif-dot"></i></button>
         <div class="profile" onclick="switchSection('profile')" title="Open My Profile">
           <span id="topAvatar" class="avatar">U</span>
@@ -170,7 +180,7 @@
 
     <div id="mainContentArea" class="content">
 
-      <!--  VIEW A: HOME DASHBOARD  -->
+      <!-- VIEW A: HOME DASHBOARD -->
       <div id="section-dashboard">
 
         <!-- Hero Header -->
@@ -183,11 +193,20 @@
             </h1>
 
             <span id="heroDate" style="font-size: 18px; font-weight: 600; color: var(--ink); opacity: 0.85; white-space: nowrap; margin-top: -2px; margin-right: 18px;">
-              Fri, November 13, 2026
+              Tue, November 17, 2026
             </span>
           </div>
 
           <p id="heroSubtitle" class="muted" style="margin-top: 6px;">A little focus. A little teamwork. A great day ahead.</p>
+
+          <!-- MOBILE CHECK-IN BAR (Visible only <= 900px) -->
+          <div class="mobile-checkin-card">
+            <div>
+              <div id="mobileShiftStatus" style="font-size:0.75rem; font-weight:600; opacity:0.75;">Not checked in</div>
+              <div id="mobileShiftTimer" style="font-size:1.35rem; font-weight:800;">00:00</div>
+            </div>
+            <button id="mobileCheckInBtn" onclick="handlePunchToggle()" class="btn btn-primary">Check in</button>
+          </div>
         </div>
 
         <!-- 24-Hour Daylight Sky Arc -->
@@ -212,7 +231,7 @@
             <small>Your team is on track</small>
           </article>
           <article class="stat glass">
-            <span>Attendance </span>
+            <span>Attendance</span>
             <div><b id="statHours">0.0h</b><i id="statAttBadge" class="chip">Today</i></div>
             <small>Logged work session</small>
           </article>
@@ -335,7 +354,7 @@
   </div>
 </div>
 
-<!-- ============ SCRIPTS ============ -->
+<!-- SCRIPTS -->
 <script src="js/api.js"></script>
 <script src="js/attendance_ui.js?v=2"></script>
 <script src="js/admin_ui.js"></script>
@@ -343,7 +362,6 @@
 <script src="js/settings_ui.js"></script>
 <script src="js/tasks_ui.js"></script>
 
-<!-- Shared helpers & section registry (MUST load before the 7 modules below) -->
 <script src="js/ui_kit.js"></script>
 <script src="js/performance_ui.js"></script>
 <script src="js/calendar_ui.js"></script>
@@ -353,10 +371,8 @@
 <script src="js/queries_ui.js"></script>
 <script src="js/organization_ui.js"></script>
 
-<!-- Main dashboard controller & router -->
 <script src="js/dashboard.js"></script>
 
-<!-- Daylight visual engine -->
 <script src="js/theme.js"></script>
 <script src="js/sky.js"></script>
 <script src="js/chart.js"></script>

@@ -1,9 +1,10 @@
-# src/user/dtos.py
 from typing import Optional, List
 from pydantic import BaseModel, EmailStr, ConfigDict
 from src.user.models import RoleTier
 
 class UserRegister(BaseModel):
+    company_name: str = "Zenwork Studio"
+    is_new_company: bool = False
     full_name: str
     email: EmailStr
     password: str
@@ -17,6 +18,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    company_name: str
     full_name: str
     email: EmailStr
     role_tier: RoleTier
@@ -32,6 +34,7 @@ class TokenResponse(BaseModel):
 
 class OrgNodeResponse(BaseModel):
     id: int
+    company_name: str
     full_name: str
     email: EmailStr
     role_tier: RoleTier

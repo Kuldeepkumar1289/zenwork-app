@@ -1,5 +1,3 @@
-
-
 if (getAuthToken()) {
   window.location.href = "index.html";
 }
@@ -18,7 +16,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/*  Helpers  */
+/* Helpers */
 function showAlert(msg, isError = true) {
   const box = document.getElementById("alertBox");
   box.textContent = msg;
@@ -35,6 +33,18 @@ function togglePassVisibility(inputId, btn) {
   btn.textContent = isHidden ? "Hide" : "Show";
 }
 
+function handleCompanyModeChange(mode) {
+  const roleWrap = document.getElementById("regRoleSelectWrap");
+  const desigInput = document.getElementById("regDesignation");
+  if (mode === "create") {
+    if (roleWrap) roleWrap.classList.add("hidden");
+    if (desigInput && !desigInput.value) desigInput.value = "Founder & Admin";
+  } else {
+    if (roleWrap) roleWrap.classList.remove("hidden");
+    if (desigInput && desigInput.value === "Founder & Admin") desigInput.value = "";
+  }
+}
+
 function toggleAuthMode(mode) {
   document.getElementById("alertBox").classList.add("hidden");
   document.getElementById("forgotForm").classList.add("hidden");
@@ -44,9 +54,9 @@ function toggleAuthMode(mode) {
   document.getElementById("registerForm").classList.toggle("hidden", !isRegister);
 
   document.getElementById("formHeading").textContent =
-    isRegister ? "Create your account" : "Welcome back";
+    isRegister ? "Create your workspace account" : "Welcome back";
   document.getElementById("formSubheading").textContent =
-    isRegister ? "Join your company workspace on Zenwork."
+    isRegister ? "Create a new company workspace or join your existing team."
                : "Sign in to access your tasks, attendance, and team workspace.";
   document.getElementById("toggleText").innerHTML = isRegister
     ? `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
@@ -66,7 +76,7 @@ function toggleForgotPanel(showForgot) {
                : "Sign in to access your tasks, attendance, and team workspace.";
 }
 
-/*  Sign In  */
+/* Sign In */
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("loginSubmitBtn");
@@ -75,7 +85,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
 
   try {
     const formData = new URLSearchParams();
-    formData.append("username", document.getElementById("loginEmail").value);
+    formData.append("username", document.getElementById("loginEmail").value.trim());
     formData.append("password", document.getElementById("loginPassword").value);
 
     const response = await fetch(`${API_BASE_URL}/users/login`, {
@@ -98,7 +108,7 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 
-/*  Inline Forgot Password  */
+/* Inline Forgot Password */
 document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("forgotSubmitBtn");
@@ -106,7 +116,7 @@ document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   btn.textContent = "Resetting...";
 
   try {
-    const email = document.getElementById("forgotEmail").value;
+    const email = document.getElementById("forgotEmail").value.trim();
     const new_password = document.getElementById("forgotNewPassword").value;
     const res = await apiRequest("/users/forgot-password", "POST", { email, new_password });
     showAlert(res.message, false);
@@ -120,28 +130,41 @@ document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   }
 });
 
-/*  Sign Up  */
+/* Multi-Company Sign Up */
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("regSubmitBtn");
   btn.disabled = true;
-  btn.textContent = "Creating account...";
+  btn.textContent = "Setting up workspace...";
 
   try {
+    const modeEl = document.getElementById("regCompanyMode");
+    const isNewCompany = modeEl ? modeEl.value === "create" : false;
+    const companyName = document.getElementById("regCompanyName").value.trim();
+
     await apiRequest("/users/register", "POST", {
-      full_name:   document.getElementById("regName").value,
-      email:       document.getElementById("regEmail").value,
-      designation: document.getElementById("regDesignation").value,
-      role_tier:   document.getElementById("regRole").value,
-      password:    document.getElementById("regPassword").value
+      company_name:   companyName,
+      is_new_company: isNewCompany,
+      full_name:      document.getElementById("regName").value.trim(),
+      email:          document.getElementById("regEmail").value.trim(),
+      designation:    document.getElementById("regDesignation").value.trim() || "Team Member",
+      role_tier:      isNewCompany ? "ADMIN" : document.getElementById("regRole").value,
+      password:       document.getElementById("regPassword").value
     });
-    showAlert("Account created successfully! Please sign in now.", false);
+
+    showAlert(
+      isNewCompany
+        ? `Workspace "${companyName}" created! Sign in as Admin to manage your team.`
+        : `Account created under "${companyName}"! Please sign in now.`,
+      false
+    );
     document.getElementById("registerForm").reset();
-    setTimeout(() => toggleAuthMode("login"), 1200);
+    handleCompanyModeChange("join");
+    setTimeout(() => toggleAuthMode("login"), 1400);
   } catch (err) {
     showAlert(err.message, true);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Create account";
+    btn.textContent = "Create workspace account";
   }
 });

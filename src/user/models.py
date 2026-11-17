@@ -1,19 +1,20 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column,Float, Integer, String, Enum as SqlEnum, ForeignKey
+from sqlalchemy import Column, Float, Integer, String, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import relationship, backref
 from src.utils.db import Base
 
 class RoleTier(str, Enum):
     ADMIN = "ADMIN"
     MANAGER = "MANAGER"
-    MEMBER = "MEMBER" 
+    MEMBER = "MEMBER"
 
 class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    full_name = Column(String(100), nullable=False)  # <-- 'username' ki jagah 'full_name'
+    company_name = Column(String(120), nullable=False, index=True, default="Zenwork Studio")
+    full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
 

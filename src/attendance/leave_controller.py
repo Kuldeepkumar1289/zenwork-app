@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 from src.attendance.models import LeaveRequest, LeaveRequestStatus, LeaveType, Attendance, AttendanceStatus
@@ -87,9 +87,13 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
     if not leave:
         raise HTTPException(status_code=404, detail="Leave/WFH request not found.")
 
+    applicant = db.query(User).filter(User.id == leave.user_id).first()
+    if not applicant or applicant.company_name != current_user.company_name:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to a different workspace.")
+
     # Access check: Admin or direct reporting manager
     is_admin = current_user.role_tier == RoleTier.ADMIN
-    is_manager = current_user.role_tier == RoleTier.MANAGER and leave.user_id in get_subordinate_ids(current_user)
+    is_manager = current_user.role_tier == RoleTier.MANAGER and leave.user_id in (get_subordinate_ids(current_user) or [])
 
     if not (is_admin or is_manager):
         raise HTTPException(
@@ -99,7 +103,6 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
 
     # Deduct balance ONLY when Manager/Admin approves (and prevent double deduction)
     if data.status == LeaveRequestStatus.APPROVED and leave.status != LeaveRequestStatus.APPROVED:
-        applicant = db.query(User).filter(User.id == leave.user_id).first()
         sync_user_quotas(applicant, db)
 
         if leave.leave_type == LeaveType.WFH:
@@ -121,16 +124,27 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
     leave.reviewed_by_id = current_user.id
     leave.admin_notes = data.admin_notes
 
-    # Agar WFH/Leave approve ho gaya, toh today's attendance record ko sync update karega
-    today = date.today()
-    if data.status == LeaveRequestStatus.APPROVED and leave.start_date <= today <= leave.end_date:
-        existing_att = db.query(Attendance).filter(
-            Attendance.user_id == leave.user_id,
-            Attendance.date == today
-        ).first()
-        if existing_att:
-            existing_att.status = AttendanceStatus.ON_LEAVE if leave.leave_type != LeaveType.WFH else AttendanceStatus.PRESENT
-            existing_att.notes = f"{existing_att.notes or ''} | Approved {leave.leave_type.value}".strip(" |")
+    if data.status == LeaveRequestStatus.APPROVED:
+        curr_day = leave.start_date
+        while curr_day <= leave.end_date:
+            existing_att = db.query(Attendance).filter(
+                Attendance.user_id == leave.user_id,
+                Attendance.date == curr_day
+            ).first()
+            if existing_att:
+                existing_att.status = AttendanceStatus.ON_LEAVE if leave.leave_type != LeaveType.WFH else AttendanceStatus.PRESENT
+                existing_att.notes = f"{existing_att.notes or ''} | Approved {leave.leave_type.value}".strip(" |")
+            elif leave.leave_type != LeaveType.WFH:
+                db.add(Attendance(
+                    user_id=leave.user_id,
+                    date=curr_day,
+                    punch_in=datetime.combine(curr_day, datetime.min.time()),
+                    punch_out=datetime.combine(curr_day, datetime.min.time()),
+                    total_hours=0.0,
+                    status=AttendanceStatus.ON_LEAVE,
+                    notes=f"Approved {leave.leave_type.value} Leave"
+                ))
+            curr_day += timedelta(days=1)
 
     db.commit()
     db.refresh(leave)
@@ -139,10 +153,18 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
 
 def list_leave_requests(current_user: User, db: Session):
     if current_user.role_tier == RoleTier.ADMIN:
-        return db.query(LeaveRequest).order_by(LeaveRequest.created_at.desc()).all()
+        company_user_ids = [
+            u.id for u in db.query(User.id).filter(User.company_name == current_user.company_name).all()
+        ]
+        return db.query(LeaveRequest).filter(
+            LeaveRequest.user_id.in_(company_user_ids)
+        ).order_by(LeaveRequest.created_at.desc()).all()
     elif current_user.role_tier == RoleTier.MANAGER:
-        sub_ids = get_subordinate_ids(current_user)
-        sub_ids.append(current_user.id)
-        return db.query(LeaveRequest).filter(LeaveRequest.user_id.in_(sub_ids)).order_by(LeaveRequest.created_at.desc()).all()
+        sub_ids = (get_subordinate_ids(current_user) or []) + [current_user.id]
+        return db.query(LeaveRequest).filter(
+            LeaveRequest.user_id.in_(sub_ids)
+        ).order_by(LeaveRequest.created_at.desc()).all()
     else:
-        return db.query(LeaveRequest).filter(LeaveRequest.user_id == current_user.id).order_by(LeaveRequest.created_at.desc()).all()
+        return db.query(LeaveRequest).filter(
+            LeaveRequest.user_id == current_user.id
+        ).order_by(LeaveRequest.created_at.desc()).all()

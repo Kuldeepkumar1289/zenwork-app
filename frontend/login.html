@@ -60,18 +60,15 @@
 
   <div class="login-shell">
 
-    <!-- LEFT STAGE: Clean Brand Narrative & Workspace Highlights -->
+    <!-- LEFT STAGE -->
     <section class="flex flex-col justify-center gap-8">
-      
-      <!-- Top Brand Row -->
       <div class="flex items-center gap-3">
         <div class="brand" style="padding: 0;">
           <span class="brand-mark">z</span> zenwork
         </div>
-        <span class="chip">ACME Studio • Workspace</span>
+        <span class="chip">Multi-Company Workspace</span>
       </div>
 
-      <!-- Hero Copy -->
       <div class="space-y-3.5">
         <p class="kicker">Your work, in harmony</p>
         <h1 style="font-size: clamp(36px, 4.2vw, 56px); font-weight: 800; line-height: 1.06;">
@@ -82,20 +79,19 @@
         </p>
       </div>
 
-      <!-- Structured 3-Card Feature Grid -->
       <div class="grid grid-cols-1 sm:grid-cols-3 gap-3.5 pt-2">
         <div class="feature-card">
           <span class="text-base">☑</span>
           <div>
             <b class="block text-xs">Smart Tasks</b>
-            <small class="mt-0.5">Blockers & deadlines</small>
+            <small class="mt-0.5">Blockers &amp; deadlines</small>
           </div>
         </div>
         <div class="feature-card">
           <span class="text-base">🕒</span>
           <div>
             <b class="block text-xs">Live Shifts</b>
-            <small class="mt-0.5">Punch-in & WFH queue</small>
+            <small class="mt-0.5">Punch-in &amp; WFH queue</small>
           </div>
         </div>
         <div class="feature-card">
@@ -106,10 +102,9 @@
           </div>
         </div>
       </div>
-
     </section>
 
-    <!-- RIGHT STAGE: Glassmorphic Sign In / Register / Reset Card -->
+    <!-- RIGHT STAGE -->
     <section class="glass auth-card w-full max-w-md mx-auto">
 
       <div class="flex items-center justify-between mb-5">
@@ -170,22 +165,33 @@
         </div>
       </form>
 
-      <!-- 3. SIGN UP FORM -->
+      <!-- 3. MULTI-COMPANY SIGN UP FORM -->
       <form id="registerForm" class="hidden space-y-3.5">
+        <div>
+          <label class="block text-xs font-semibold mb-1">Workspace Setup</label>
+          <select id="regCompanyMode" class="day-input" onchange="handleCompanyModeChange(this.value)">
+            <option value="join">Join Existing Company Workspace</option>
+            <option value="create">Create a New Company Workspace (Admin)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-xs font-semibold mb-1">Company / Organization Name</label>
+          <input type="text" id="regCompanyName" required placeholder="e.g. Zentrix Technologies" class="day-input">
+        </div>
         <div>
           <label class="block text-xs font-semibold mb-1">Full Name</label>
           <input type="text" id="regName" required placeholder="Alex Morgan" class="day-input">
         </div>
         <div>
           <label class="block text-xs font-semibold mb-1">Work Email</label>
-          <input type="email" id="regEmail" required placeholder="alex@zenwork.com" class="day-input">
+          <input type="email" id="regEmail" required placeholder="alex@company.com" class="day-input">
         </div>
         <div class="grid grid-cols-2 gap-3">
           <div>
             <label class="block text-xs font-semibold mb-1">Designation</label>
             <input type="text" id="regDesignation" required placeholder="Product Designer" class="day-input">
           </div>
-          <div>
+          <div id="regRoleSelectWrap">
             <label class="block text-xs font-semibold mb-1">Role Tier</label>
             <select id="regRole" class="day-input">
               <option value="MEMBER">Member</option>
@@ -198,7 +204,7 @@
           <input type="password" id="regPassword" required minlength="6" placeholder="Min 6 characters" class="day-input">
         </div>
         <button type="submit" id="regSubmitBtn" class="btn btn-primary wide" style="padding: 12px; font-size: 14px;">
-          Create account
+          Create workspace account
         </button>
       </form>
 
@@ -214,9 +220,21 @@
 
   </div>
 
-  <!-- Applies real-time Daylight colors automatically without sky arc -->
   <script src="js/theme.js"></script>
   <script src="js/api.js"></script>
   <script src="js/login.js"></script>
+  <script>
+    function handleCompanyModeChange(mode) {
+      const roleWrap = document.getElementById("regRoleSelectWrap");
+      const desigInput = document.getElementById("regDesignation");
+      if (mode === "create") {
+        if (roleWrap) roleWrap.classList.add("hidden");
+        if (desigInput && !desigInput.value) desigInput.value = "Founder & Admin";
+      } else {
+        if (roleWrap) roleWrap.classList.remove("hidden");
+        if (desigInput && desigInput.value === "Founder & Admin") desigInput.value = "";
+      }
+    }
+  </script>
 </body>
 </html>

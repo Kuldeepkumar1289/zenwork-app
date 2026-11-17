@@ -3,12 +3,16 @@ from typing import Optional
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status, Request
 from math import radians, sin, cos, sqrt, atan2
+from calendar import monthrange
 
 from src.attendance.models import (
     Attendance,
     AttendanceStatus,
     AttendanceRegularization,
-    RegularizationStatus
+    RegularizationStatus,
+    LeaveRequest, 
+    LeaveRequestStatus, 
+    LeaveType
 )
 from src.attendance.dtos import (
     PunchInRequest,
@@ -298,3 +302,94 @@ def review_regularization_request(
     db.commit()
     db.refresh(req)
     return req
+
+
+def get_my_monthly_attendance(month_str: Optional[str], current_user: User, db: Session):
+    """Returns daily check-in/check-out records and summary for the selected YYYY-MM month."""
+    now = get_utc_now()
+    if not month_str or len(month_str) != 7:
+        month_str = now.strftime("%Y-%m")
+
+    year, month = map(int, month_str.split("-"))
+    _, last_day = monthrange(year, month)
+    start_dt = date(year, month, 1)
+    end_dt = date(year, month, last_day)
+
+    records = db.query(Attendance).filter(
+        Attendance.user_id == current_user.id,
+        Attendance.date >= start_dt,
+        Attendance.date <= end_dt
+    ).order_by(Attendance.date.desc()).all()
+
+    total_hours = round(sum(float(r.total_hours or 0.0) for r in records), 2)
+    present_days = sum(1 for r in records if r.status in [AttendanceStatus.PRESENT, AttendanceStatus.HALF_DAY])
+
+    return {
+        "month": month_str,
+        "total_hours": total_hours,
+        "present_days": present_days,
+        "records": [
+            {
+                "id": r.id,
+                "date": r.date.isoformat(),
+                "punch_in": r.punch_in.isoformat() if r.punch_in else None,
+                "punch_out": r.punch_out.isoformat() if r.punch_out else None,
+                "total_hours": float(r.total_hours or 0.0),
+                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+                "notes": r.notes
+            }
+            for r in records
+        ]
+    }
+
+
+def get_company_live_statuses(current_user: User, db: Session):
+    """Returns today's live status (CHECKED_IN, CHECKED_OUT, WFH, ON_LEAVE, NOT_CHECKED_IN) for every teammate in the same company."""
+    today = get_utc_now().date()
+    company_users = db.query(User).filter(User.company_name == current_user.company_name).all()
+    user_ids = [u.id for u in company_users]
+
+    todays_att = {
+        a.user_id: a
+        for a in db.query(Attendance).filter(
+            Attendance.user_id.in_(user_ids),
+            Attendance.date == today
+        ).all()
+    }
+
+    approved_leaves = db.query(LeaveRequest).filter(
+        LeaveRequest.user_id.in_(user_ids),
+        LeaveRequest.status == LeaveRequestStatus.APPROVED,
+        LeaveRequest.start_date <= today,
+        LeaveRequest.end_date >= today
+    ).all()
+    leave_map = {l.user_id: l for l in approved_leaves}
+
+    status_map = {}
+    for u in company_users:
+        att = todays_att.get(u.id)
+        lv = leave_map.get(u.id)
+
+        if att and att.punch_in and not att.punch_out:
+            status_map[u.id] = {
+                "state": "CHECKED_IN",
+                "label": "Checked in",
+                "punch_in": att.punch_in.isoformat(),
+                "mode": "WFH" if (lv and lv.leave_type == LeaveType.WFH) else "Office"
+            }
+        elif att and att.punch_out:
+            status_map[u.id] = {
+                "state": "CHECKED_OUT",
+                "label": f"Checked out ({att.total_hours}h)",
+                "punch_in": att.punch_in.isoformat() if att.punch_in else None,
+                "mode": "WFH" if (lv and lv.leave_type == LeaveType.WFH) else "Office"
+            }
+        elif lv:
+            if lv.leave_type == LeaveType.WFH:
+                status_map[u.id] = {"state": "WFH", "label": "Work From Home", "punch_in": None, "mode": "WFH"}
+            else:
+                status_map[u.id] = {"state": "ON_LEAVE", "label": f"On Leave ({lv.leave_type.value})", "punch_in": None, "mode": "Leave"}
+        else:
+            status_map[u.id] = {"state": "NOT_CHECKED_IN", "label": "Not checked in", "punch_in": None, "mode": "Offline"}
+
+    return status_map

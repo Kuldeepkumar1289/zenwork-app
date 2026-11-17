@@ -141,3 +141,18 @@ def review_regularization(
 ):
     """Approve or reject an attendance regularization request."""
     return review_regularization_request(request_id=request_id, data=data, current_user=current_user, db=db)
+
+@attendance_router.get("/me/history", summary="Get daily check-in/check-out records for a given month (YYYY-MM)")
+def fetch_my_monthly_history(
+    month: Optional[str] = None,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_my_monthly_attendance(month_str=month, current_user=current_user, db=db)
+
+@attendance_router.get("/team/live-status", summary="Get today's live Check-in, WFH, and Leave status for all company members")
+def fetch_company_live_statuses(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    return get_company_live_statuses(current_user=current_user, db=db)

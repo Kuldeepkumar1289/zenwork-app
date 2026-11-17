@@ -4,11 +4,14 @@ let currentAttFilter = "ALL";
 
 async function renderAttendanceSection() {
     const container = document.getElementById("section-dynamic");
+    const now = new Date();
+    const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+
     container.innerHTML = `
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
-                <h1 class="text-2xl font-semibold text-gray-900">Attendance, Leaves & WFH</h1>
-                <p class="text-xs text-gray-500 mt-0.5">Track work sessions, regularize missed check-ins, and manage leave/WFH quotas.</p>
+                <h1 class="text-2xl font-semibold text-gray-900">Attendance, Leaves &amp; WFH</h1>
+                <p class="text-xs text-gray-500 mt-0.5">Track work sessions, review monthly daily check-ins, and manage leave/WFH quotas.</p>
             </div>
             <div class="flex items-center gap-2 flex-wrap">
                 <button onclick="openRegModal()" class="px-3.5 py-2 rounded-xl border border-amber-500 text-amber-700 hover:bg-amber-50 text-xs font-semibold transition cursor-pointer">
@@ -23,11 +26,11 @@ async function renderAttendanceSection() {
             </div>
         </div>
 
-        <!-- 4 KPI Cards: 2x2 on mobile/tablet, 4 columns on desktop -->
-        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <!-- 4 KPI Cards -->
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mt-4">
             <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
                 <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#E6F4EA] text-[#1E6B52]">Today's Shift</span>
-                <p id="attTabTimer" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">00h 00m</p>
+                <p id="attTabTimer" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">0 min</p>
                 <p id="attTabHours" class="text-[11px] text-gray-400 mt-0.5">0.0 hrs logged</p>
             </div>
 
@@ -46,7 +49,7 @@ async function renderAttendanceSection() {
                     <span class="text-[10px] font-semibold px-2 py-0.5 rounded bg-amber-50 text-amber-700 whitespace-nowrap">Resets monthly</span>
                 </div>
                 <p id="attWfhBalance" class="text-xl sm:text-2xl font-bold text-gray-900 mt-2 whitespace-nowrap">2 / 2</p>
-                <p class="text-[11px] text-gray-400 mt-0.5">Refreshes to 2 every month (min 0)</p>
+                <p class="text-[11px] text-gray-400 mt-0.5">Refreshes to 2 every month</p>
             </div>
 
             <div class="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#E6ECE8]">
@@ -56,11 +59,43 @@ async function renderAttendanceSection() {
             </div>
         </div>
 
-        <!-- Leave & WFH Requests Table -->
-        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5">
+        <!-- Monthly Daily Check-In / Check-Out Log -->
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 mt-4">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <div>
-                    <h2 class="text-sm font-semibold text-gray-900">Leave & WFH Approval Queue</h2>
+                    <h2 class="text-sm font-semibold text-gray-900">Monthly Daily Attendance &amp; Work Hours Log</h2>
+                    <p id="monthlySummarySub" class="text-[11px] text-gray-400">Daily check-in, check-out, and total hours worked across the month.</p>
+                </div>
+                <div class="flex items-center gap-2">
+                    <label for="attHistoryMonth" class="text-xs text-gray-500 font-medium">Month:</label>
+                    <input type="month" id="attHistoryMonth" value="${defaultMonth}" onchange="loadMonthlyAttendanceHistory(this.value)"
+                        class="px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-700">
+                </div>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="w-full min-w-[620px] text-left border-collapse">
+                    <thead>
+                        <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
+                            <th class="py-2.5 pr-3">Date</th>
+                            <th class="py-2.5 pr-3">Check In</th>
+                            <th class="py-2.5 pr-3">Check Out</th>
+                            <th class="py-2.5 pr-3">Total Duration</th>
+                            <th class="py-2.5 pr-3">Status</th>
+                            <th class="py-2.5">Notes</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monthlyHistoryBody" class="divide-y divide-[#F0F4F2] text-xs">
+                        <tr><td colspan="6" class="py-6 text-center text-gray-400">Loading monthly work log...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Leave & WFH Requests Table -->
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 mt-4">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Leave &amp; WFH Approval Queue</h2>
                     <p class="text-[11px] text-gray-400">Balances deduct only when approved by a Manager or Admin.</p>
                 </div>
                 <div class="flex items-center gap-1.5 text-xs flex-wrap">
@@ -83,7 +118,7 @@ async function renderAttendanceSection() {
                         </tr>
                     </thead>
                     <tbody id="leavesTableBody" class="divide-y divide-[#F0F4F2] text-xs">
-                        <tr><td colspan="7" class="py-6 text-center text-gray-400">Loading leave & WFH records...</td></tr>
+                        <tr><td colspan="7" class="py-6 text-center text-gray-400">Loading leave &amp; WFH records...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -177,7 +212,7 @@ async function renderAttendanceSection() {
                             <input type="time" id="regOutTime" class="w-full px-3 py-2 rounded-xl border border-gray-200">
                         </div>
                     </div>
-                    <p class="text-[11px] text-gray-400">Leave Check-Out blank if you are still working today — your live shift timer will resume from Check-In time once approved.</p>
+                    <p class="text-[11px] text-gray-400">Leave Check-Out blank if you are still working today — your live shift timer will resume once approved.</p>
                     <div>
                         <label class="block font-medium text-gray-700 mb-1">Reason</label>
                         <textarea id="regReason" rows="2" required placeholder="e.g. Forgot to punch in at 9:30 AM due to morning client call..."
@@ -196,11 +231,81 @@ async function renderAttendanceSection() {
     document.getElementById("applyRegForm").addEventListener("submit", handleRegSubmit);
 
     if (todayAttendance) {
-        document.getElementById("attTabHours").textContent = `${todayAttendance.total_hours} hrs logged`;
-        document.getElementById("attTabTimer").textContent = document.getElementById("shiftTimerDisplay").textContent;
+        document.getElementById("attTabHours").textContent = `${todayAttendance.total_hours || 0} hrs logged`;
+        document.getElementById("attTabTimer").textContent = document.getElementById("shiftTimerDisplay")?.textContent || "0 min";
     }
 
-    await Promise.all([loadUserQuotas(), loadLeavesData(), loadRegularizations()]);
+    await Promise.all([
+        loadMonthlyAttendanceHistory(defaultMonth),
+        loadUserQuotas(),
+        loadLeavesData(),
+        loadRegularizations()
+    ]);
+}
+
+/* ---------- Monthly Daily Work Log ---------- */
+async function loadMonthlyAttendanceHistory(monthStr) {
+    const tbody = document.getElementById("monthlyHistoryBody");
+    const subEl = document.getElementById("monthlySummarySub");
+    if (!tbody) return;
+
+    try {
+        const res = await apiRequest(`/attendance/me/history?month=${encodeURIComponent(monthStr)}`);
+        const records = res?.records || [];
+
+        if (subEl) {
+            subEl.innerHTML = `Total Logged: <b>${res.total_hours || 0} hrs</b> across <b>${res.present_days || 0} working day(s)</b> in ${res.month}.`;
+        }
+
+        if (!records.length) {
+            tbody.innerHTML = `<tr><td colspan="6" class="py-6 text-center text-gray-400">No check-in records logged for ${monthStr} yet.</td></tr>`;
+            return;
+        }
+
+        const fmtClock = (iso) => {
+            if (!iso) return `<span class="text-emerald-600 font-semibold">Active Shift</span>`;
+            const s = iso.endsWith("Z") ? iso : iso + "Z";
+            return new Date(s).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+        };
+
+        const fmtDate = (dStr) => {
+            const d = new Date(dStr + "T00:00:00");
+            return d.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+        };
+
+        const statusBadge = {
+            PRESENT:  "bg-[#E6F4EA] text-[#1E6B52]",
+            HALF_DAY: "bg-amber-50 text-amber-700",
+            ON_LEAVE: "bg-purple-50 text-purple-700",
+            ABSENT:   "bg-red-50 text-red-700"
+        };
+
+        tbody.innerHTML = records.map(r => {
+            let durationText = formatDuration(r.total_hours);
+            if (!r.punch_out && r.punch_in) {
+                const startMs = new Date(r.punch_in.endsWith("Z") ? r.punch_in : r.punch_in + "Z").getTime();
+                const liveHrs = Math.max(0, (Date.now() - startMs) / 3600000);
+                durationText = `${formatDuration(liveHrs)} (Live)`;
+            }
+
+            return `
+                <tr class="hover:bg-[#F9FBFA]">
+                    <td class="py-3 pr-3 font-semibold text-gray-900 whitespace-nowrap">${fmtDate(r.date)}</td>
+                    <td class="py-3 pr-3 text-gray-700 whitespace-nowrap">${fmtClock(r.punch_in)}</td>
+                    <td class="py-3 pr-3 text-gray-700 whitespace-nowrap">${fmtClock(r.punch_out)}</td>
+                    <td class="py-3 pr-3 font-bold text-[#1E6B52] whitespace-nowrap">${durationText}</td>
+                    <td class="py-3 pr-3 whitespace-nowrap">
+                        <span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusBadge[r.status] || "bg-gray-100 text-gray-600"}">
+                            ${r.status.replace("_", " ")}
+                        </span>
+                    </td>
+                    <td class="py-3 text-gray-500 max-w-xs truncate">${r.notes || "—"}</td>
+                </tr>
+            `;
+        }).join("");
+    } catch (err) {
+        tbody.innerHTML = `<tr><td colspan="6" class="py-5 text-center text-red-500">Could not load monthly attendance log.</td></tr>`;
+    }
 }
 
 /* ---------- Quotas & Leave / WFH Handlers ---------- */
@@ -229,10 +334,10 @@ function updateModalQuotaHint() {
     const title = document.getElementById("leaveModalTitle");
     if (type === "WFH") {
         title.textContent = "Apply for Work From Home (WFH)";
-        hint.innerHTML = `Available WFH this month: <b>${userQuotas.wfh_balance} of 2 days</b>. (Cannot go below 0; refreshes to 2 next month)`;
+        hint.innerHTML = `Available WFH this month: <b>${userQuotas.wfh_balance} of 2 days</b>. (Resets to 2 next month)`;
     } else {
         title.textContent = "Apply for Leave";
-        hint.innerHTML = `Available Leave Balance: <b>${userQuotas.leave_balance} days</b>. (Increments +2/month; overdraft allowed up to <b>-5 days</b>)`;
+        hint.innerHTML = `Available Leave Balance: <b>${userQuotas.leave_balance} days</b>. (+2/month; overdraft allowed up to <b>-5 days</b>)`;
     }
 }
 
@@ -255,16 +360,16 @@ async function handleLeaveSubmit(e) {
 
     const days = Math.floor((new Date(end_date) - new Date(start_date)) / 86400000) + 1;
     if (days <= 0) {
-        alert("End date must be on or after start date.");
+        if (typeof showToast === "function") showToast("End date must be on or after start date.", "error");
         return;
     }
 
     if (leave_type === "WFH" && userQuotas.wfh_balance - days < 0) {
-        alert(`Insufficient WFH balance (${userQuotas.wfh_balance} left). WFH cannot go below 0.`);
+        if (typeof showToast === "function") showToast(`Insufficient WFH balance (${userQuotas.wfh_balance} left).`, "error");
         return;
     }
     if (leave_type !== "WFH" && userQuotas.leave_balance - days < -5) {
-        alert(`Leave overdraft limit exceeded. Current balance: ${userQuotas.leave_balance} days (minimum allowed is -5).`);
+        if (typeof showToast === "function") showToast(`Leave overdraft limit exceeded (min -5 days allowed).`, "error");
         return;
     }
 
@@ -272,9 +377,10 @@ async function handleLeaveSubmit(e) {
         await apiRequest("/attendance/leaves", "POST", { leave_type, start_date, end_date, reason });
         closeLeaveModal();
         e.target.reset();
+        if (typeof showToast === "function") showToast(`${leave_type} request submitted for approval.`, "success");
         await loadLeavesData();
     } catch (err) {
-        alert("Failed to submit: " + err.message);
+        if (typeof showToast === "function") showToast(err.message || "Failed to submit request.", "error");
     }
 }
 
@@ -355,9 +461,10 @@ function renderFilteredLeavesTable() {
 async function reviewLeaveAction(requestId, status) {
     try {
         await apiRequest(`/attendance/leaves/${requestId}/review`, "PATCH", { status });
+        if (typeof showToast === "function") showToast(`Request ${status.toLowerCase()}.`, "success");
         await Promise.all([loadUserQuotas(), loadLeavesData()]);
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
     }
 }
 
@@ -393,9 +500,10 @@ async function handleRegSubmit(e) {
         await apiRequest("/attendance/regularize", "POST", payload);
         closeRegModal();
         e.target.reset();
+        if (typeof showToast === "function") showToast("Regularization request submitted.", "success");
         await loadRegularizations();
     } catch (err) {
-        alert("Regularization failed: " + err.message);
+        if (typeof showToast === "function") showToast(err.message || "Regularization failed.", "error");
     }
 }
 
@@ -445,12 +553,18 @@ async function loadRegularizations() {
 async function reviewRegAction(requestId, status) {
     try {
         await apiRequest(`/attendance/regularizations/${requestId}/review`, "PATCH", { status });
-        await Promise.all([loadRegularizations(), loadTodayAttendance()]);
+        if (typeof showToast === "function") showToast(`Regularization ${status.toLowerCase()}.`, "success");
+        const monthVal = document.getElementById("attHistoryMonth")?.value;
+        await Promise.all([
+            loadRegularizations(),
+            loadTodayAttendance(),
+            monthVal ? loadMonthlyAttendanceHistory(monthVal) : Promise.resolve()
+        ]);
         if (todayAttendance) {
-            document.getElementById("attTabHours").textContent = `${todayAttendance.total_hours} hrs logged`;
-            document.getElementById("attTabTimer").textContent = document.getElementById("shiftTimerDisplay").textContent;
+            document.getElementById("attTabHours").textContent = `${todayAttendance.total_hours || 0} hrs logged`;
+            document.getElementById("attTabTimer").textContent = document.getElementById("shiftTimerDisplay")?.textContent || "0 min";
         }
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
     }
 }

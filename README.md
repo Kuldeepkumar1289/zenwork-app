@@ -161,9 +161,9 @@ uvicorn src.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
 ### Access points
-- Swagger UI: http://127.0.0.1:8000/docs
-- ReDoc: http://127.0.0.1:8000/redoc
-- Health endpoint: http://127.0.0.1:8000/
+- Swagger UI: http://127.0.0.1:8001/docs
+- ReDoc: http://127.0.0.1:8001/redoc
+- Health endpoint: http://127.0.0.1:8001 
 
 ## 11. API Flow Summary
 Typical flow:

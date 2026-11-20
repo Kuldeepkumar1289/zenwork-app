@@ -1,5 +1,8 @@
-/* daylight-init.js — Automatic Weather & Clock-Synced Sun/Moon Engine */
+/* daylight-init.js — Zero-GPS Cached Weather & Clock-Synced Sun/Moon Engine */
 document.addEventListener("DOMContentLoaded", () => {
+  const WEATHER_CACHE_KEY = "zenwork_weather_cache";
+  const CACHE_TTL_MS = 2 * 60 * 60 * 1000; // 2 hours cache
+
   function getNowHour() {
     const now = new Date();
     return now.getHours() + now.getMinutes() / 60 + now.getSeconds() / 3600;
@@ -48,27 +51,43 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function fetchLocalWeather() {
-    if (!("geolocation" in navigator)) return;
-    navigator.geolocation.getCurrentPosition(
-      async (pos) => {
-        try {
-          const { latitude, longitude } = pos.coords;
-          const res = await fetch(
-            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
-          );
-          const data = await res.json();
-          const cw = data?.current_weather;
-          if (cw && window.DaylightTheme) {
-            const decoded = decodeWeatherCode(cw.weathercode);
-            window.DaylightTheme.setWeather({ ...decoded, temp: cw.temperature });
-            syncDaylight();
-          }
-        } catch (_) {}
-      },
-      () => {},
-      { timeout: 4000 }
-    );
+  async function fetchWeatherWithoutGPS() {
+    try {
+      // 1. Use cached weather if fetched within last 2 hours
+      const cachedRaw = localStorage.getItem(WEATHER_CACHE_KEY);
+      if (cachedRaw) {
+        const cached = JSON.parse(cachedRaw);
+        if (Date.now() - cached.savedAt < CACHE_TTL_MS && window.DaylightTheme) {
+          window.DaylightTheme.setWeather(cached.weather);
+          syncDaylight();
+          return;
+        }
+      }
+
+      // 2. Get approximate city coordinates via IP (no GPS or permission popup needed)
+      const locRes = await fetch("https://ipwho.is/");
+      const loc = await locRes.json();
+      if (!loc || !loc.success) return;
+
+      const weatherRes = await fetch(
+        `https://api.open-meteo.com/v1/forecast?latitude=${loc.latitude}&longitude=${loc.longitude}&current_weather=true`
+      );
+      const data = await weatherRes.json();
+      const cw = data?.current_weather;
+
+      if (cw && window.DaylightTheme) {
+        const decoded = decodeWeatherCode(cw.weathercode);
+        const weatherObj = { ...decoded, temp: cw.temperature };
+        localStorage.setItem(
+          WEATHER_CACHE_KEY,
+          JSON.stringify({ savedAt: Date.now(), weather: weatherObj })
+        );
+        window.DaylightTheme.setWeather(weatherObj);
+        syncDaylight();
+      }
+    } catch (_) {
+      // Silently stay on clock-synced bright theme if offline
+    }
   }
 
   if (window.DaylightChart) {
@@ -76,15 +95,12 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   syncDaylight();
-  fetchLocalWeather();
+  fetchWeatherWithoutGPS();
 
+  // Smooth clock tick every 60s (uses local clock only)
   setInterval(() => {
     if (!document.hidden) syncDaylight();
   }, 60000);
-
-  setInterval(() => {
-    if (!document.hidden) fetchLocalWeather();
-  }, 15 * 60 * 1000);
 
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) syncDaylight();

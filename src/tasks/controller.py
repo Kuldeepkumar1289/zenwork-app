@@ -7,14 +7,21 @@ from src.tasks.dtos import TaskCreate, TaskUpdateStatus
 from src.user.models import User, RoleTier
 from src.tasks.dtos import TaskAnalyticsResponse, ReportBlockerRequest, EscalationItem
 
-def get_subordinate_ids(user: User) -> List[int]:
-    """Recursively collect IDs of all direct and indirect subordinates."""
-    ids = []
-    for sub in user.subordinates:
-        ids.append(sub.id)
-        ids.extend(get_subordinate_ids(sub))
-    return ids
+def get_subordinate_ids(user: User, visited: set[int] | None = None) -> list[int]:
+    if visited is None:
+        visited = set()
+    if user.id in visited:
+        return []
+    visited.add(user.id)
 
+    clean_company = (user.company_name or "").strip().lower()
+    sub_ids = []
+    for sub in user.subordinates:
+        if sub.id not in visited and (sub.company_name or "").strip().lower() == clean_company:
+            sub_ids.append(sub.id)
+            sub_ids.extend(get_subordinate_ids(sub, visited))
+    return sub_ids
+    
 def create_task(data: TaskCreate, current_user: User, db: Session) -> Task:
     # Hierarchy check
     if data.assigned_to_id:

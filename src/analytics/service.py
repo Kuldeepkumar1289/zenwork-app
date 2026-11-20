@@ -1,27 +1,62 @@
 from datetime import datetime, timezone
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from src.user.models import User, RoleTier
-from src.tasks.models import Task, TaskStatus, BlockerLog
+
+from src.analytics.dtos import MemberWorkloadMetric, PerformanceScorecard
 from src.attendance.models import Attendance
-from src.tasks.controller import get_subordinate_ids
-from src.analytics.dtos import PerformanceScorecard, MemberWorkloadMetric
+from src.tasks.models import BlockerLog, Task, TaskStatus
+from src.user.models import RoleTier, User
+
+
+def _get_safe_subordinate_ids(manager: User, db: Session) -> list[int]:
+    """Cycle-safe breadth-first traversal of subordinates within the same company."""
+    clean_company = (manager.company_name or "").strip().lower()
+    company_users = db.query(User).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).all()
+
+    children_map: dict[int, list[int]] = {}
+    for u in company_users:
+        if u.manager_id and u.manager_id != u.id:
+            children_map.setdefault(u.manager_id, []).append(u.id)
+
+    visited: set[int] = {manager.id}
+    queue: list[int] = list(children_map.get(manager.id, []))
+    sub_ids: list[int] = []
+
+    while queue:
+        uid = queue.pop(0)
+        if uid in visited:
+            continue
+        visited.add(uid)
+        sub_ids.append(uid)
+        queue.extend(children_map.get(uid, []))
+
+    return sub_ids
+
 
 def calculate_performance_metrics(current_user: User, db: Session) -> PerformanceScorecard:
     now = datetime.now(timezone.utc).replace(tzinfo=None)
-    subordinate_ids = get_subordinate_ids(current_user)
+    clean_company = (current_user.company_name or "").strip().lower()
 
-    # Hierarchy scope resolution
+    # Hierarchy + Company scope resolution
     if current_user.role_tier == RoleTier.ADMIN:
-        relevant_users = db.query(User).all()
+        relevant_users = db.query(User).filter(
+            func.lower(func.trim(User.company_name)) == clean_company
+        ).all()
     elif current_user.role_tier == RoleTier.MANAGER:
-        relevant_users = db.query(User).filter(User.id.in_(subordinate_ids + [current_user.id])).all()
+        subordinate_ids = _get_safe_subordinate_ids(current_user, db)
+        relevant_users = db.query(User).filter(
+            User.id.in_(subordinate_ids + [current_user.id]),
+            func.lower(func.trim(User.company_name)) == clean_company
+        ).all()
     else:
         relevant_users = [current_user]
 
     relevant_user_ids = [u.id for u in relevant_users]
 
     # 1. Fetch scoped tasks
-    tasks = db.query(Task).filter(Task.assigned_to_id.in_(relevant_user_ids)).all()
+    tasks = db.query(Task).filter(Task.assigned_to_id.in_(relevant_user_ids)).all() if relevant_user_ids else []
     total_assigned = len(tasks)
     completed_tasks = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
 
@@ -38,14 +73,17 @@ def calculate_performance_metrics(current_user: User, db: Session) -> Performanc
         delivery_rate = round((completed_tasks / total_assigned) * 100, 2)
 
     # 4. Total hours logged across attendance
-    attendances = db.query(Attendance).filter(Attendance.user_id.in_(relevant_user_ids)).all()
+    attendances = db.query(Attendance).filter(Attendance.user_id.in_(relevant_user_ids)).all() if relevant_user_ids else []
     total_hours = round(sum(a.total_hours for a in attendances), 2)
 
     # 5. Active blockers count
-    active_blockers = db.query(BlockerLog).join(Task).filter(
-        Task.assigned_to_id.in_(relevant_user_ids),
-        BlockerLog.is_resolved == False
-    ).count()
+    active_blockers = (
+        db.query(BlockerLog).join(Task).filter(
+            Task.assigned_to_id.in_(relevant_user_ids),
+            BlockerLog.is_resolved == False
+        ).count()
+        if relevant_user_ids else 0
+    )
 
     # 6. Team Workload & Burnout Radar (flag if >= 4 active tasks)
     workload_list = []

@@ -175,7 +175,6 @@ async function renderProfileSection() {
     });
 }
 
-/* Interactive Drag + Zoom DP Cropper Modal */
 function openDpCropperModal(event) {
     const file = event.target.files?.[0];
     event.target.value = "";
@@ -268,7 +267,6 @@ function launchCropperOverlay(img) {
         ctx.clearRect(0, 0, boxSize, boxSize);
         ctx.drawImage(img, offsetX, offsetY, img.width * currentScale, img.height * currentScale);
 
-        // Subtle circular guide overlay
         ctx.save();
         ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
         ctx.lineWidth = 1.5;
@@ -286,7 +284,6 @@ function launchCropperOverlay(img) {
         const nextScale = baseScale * zoom;
         zoomLabel.textContent = `${zoom.toFixed(1)}x`;
 
-        // Zoom toward the center of the crop box
         const centerX = boxSize / 2;
         const centerY = boxSize / 2;
         offsetX = centerX - ((centerX - offsetX) / prevScale) * nextScale;
@@ -365,36 +362,6 @@ function launchCropperOverlay(img) {
             saveBtn.textContent = "Crop & Save Photo";
         }
     };
-
-async function uploadCroppedProfileBlob(blob, onSuccessClose, saveBtn) {
-    try {
-        const formData = new FormData();
-        formData.append("file", blob, "profile_dp.jpg");
-        const headers = { Authorization: `Bearer ${getAuthToken()}` };
-
-        let uploadRes = await fetch(`${API_BASE_URL}/media/upload`, { method: "POST", headers, body: formData });
-        if (uploadRes.status === 404) {
-            uploadRes = await fetch(`${API_BASE_URL}/media/upload-voice`, { method: "POST", headers, body: formData });
-        }
-        const uploadData = await uploadRes.json();
-        if (!uploadRes.ok) throw new Error(uploadData.detail || "Photo upload failed");
-
-        const updatedUser = await apiRequest("/users/me/profile", "PATCH", {
-            avatar_url: uploadData.media_url
-        });
-        currentUser = updatedUser;
-        localStorage.setItem("zenwork_user", JSON.stringify(currentUser));
-        if (typeof updateProfileUI === "function") updateProfileUI(currentUser);
-        if (typeof showToast === "function") showToast("Cropped profile photo saved!", "success");
-        onSuccessClose();
-        renderProfileSection();
-    } catch (err) {
-        if (typeof showToast === "function") showToast(err.message || "Could not upload profile photo.", "error");
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = "Crop & Save Photo";
-        }
-    }
 }
 
 async function removeProfileDp() {

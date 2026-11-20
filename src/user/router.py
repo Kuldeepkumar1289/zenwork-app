@@ -94,11 +94,32 @@ def get_org_tree(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    top_leaders = db.query(User).filter(
-        User.company_name == current_user.company_name,
-        User.manager_id.is_(None)
+    clean_company = (current_user.company_name or "").strip().lower()
+    company_users = db.query(User).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
     ).all()
-    return [build_org_tree(leader) for leader in top_leaders]
+
+    valid_ids = {u.id for u in company_users}
+    top_leaders = [
+        u for u in company_users
+        if u.manager_id is None or u.manager_id == u.id or u.manager_id not in valid_ids
+    ]
+
+    visited: set[int] = set()
+    tree = []
+    for leader in top_leaders:
+        node = build_org_tree(leader, visited)
+        if node:
+            tree.append(node)
+
+    # Safety fallback: include any remaining disconnected/cyclic users at root
+    for u in company_users:
+        if u.id not in visited:
+            node = build_org_tree(u, visited)
+            if node:
+                tree.append(node)
+
+    return tree
 
 
 @user_router.post("/change-password")

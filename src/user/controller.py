@@ -176,7 +176,21 @@ def authenticate_user(data: UserLogin, db: Session):
     return {"access_token": token, "token_type": "bearer", "user": user}
 
 
-def build_org_tree(user: User):
+def build_org_tree(user: User, visited: set[int] | None = None):
+    if visited is None:
+        visited = set()
+    if user.id in visited:
+        return None
+    visited.add(user.id)
+
+    clean_company = (user.company_name or "").strip().lower()
+    subs = []
+    for sub in user.subordinates:
+        if sub.id not in visited and (sub.company_name or "").strip().lower() == clean_company:
+            node = build_org_tree(sub, visited)
+            if node:
+                subs.append(node)
+
     return {
         "id": user.id,
         "company_name": user.company_name,
@@ -185,14 +199,9 @@ def build_org_tree(user: User):
         "email": user.email,
         "role_tier": user.role_tier,
         "designation": user.designation,
-        "avatar_url": user.avatar_url,
-        "subordinates": [
-            build_org_tree(sub)
-            for sub in user.subordinates
-            if sub.company_name == user.company_name
-        ]
+        "avatar_url": getattr(user, "avatar_url", None),
+        "subordinates": subs
     }
-
 
 def change_user_password(data: ChangePasswordRequest, current_user: User, db: Session):
     if not verify_password(data.current_password, current_user.hashed_password):

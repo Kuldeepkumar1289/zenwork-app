@@ -1,6 +1,8 @@
 import os
 import random
+import secrets
 import smtplib
+import string
 from datetime import datetime, timedelta, timezone
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
@@ -10,21 +12,25 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from src.user.dtos import (
+    AdminInviteEmployeeRequest,
     ChangePasswordRequest,
+    OrgRegisterRequest,
     SendOtpRequest,
     UserLogin,
-    UserRegister,
     VerifyOtpResetRequest
 )
 from src.user.models import RoleTier, User
 from src.utils.security import create_access_token, hash_password, verify_password
 
-# In-memory OTP store: { email: {"otp": "123456", "expires_at": datetime} }
 PASSWORD_RESET_OTPS = {}
 
 
+def _generate_temp_password(length: int = 10) -> str:
+    alphabet = string.ascii_letters + string.digits + "@#"
+    return "".join(secrets.choice(alphabet) for _ in range(length))
+
+
 def _send_otp_email(to_email: str, full_name: str, otp_code: str) -> bool:
-    """Sends a 6-digit OTP email via SMTP if configured in environment variables."""
     smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com")
     smtp_port = int(os.getenv("SMTP_PORT", "587"))
     smtp_user = os.getenv("SMTP_USER", "")
@@ -42,11 +48,10 @@ def _send_otp_email(to_email: str, full_name: str, otp_code: str) -> bool:
     <div style="font-family:sans-serif;max-width:480px;margin:auto;padding:24px;border:1px solid #e2e8f0;border-radius:16px;">
       <h2 style="color:#1d6b52;margin-top:0;">Zenwork Workspace Security</h2>
       <p>Hi <b>{full_name}</b>,</p>
-      <p>Use the following 6-digit One-Time Password (OTP) to reset your Zenwork account password. It expires in <b>10 minutes</b>:</p>
+      <p>Use this 6-digit One-Time Password (OTP) to reset your Zenwork password. Expires in <b>10 minutes</b>:</p>
       <div style="font-size:28px;font-weight:800;letter-spacing:6px;background:#f0fdf4;color:#166534;padding:14px 20px;border-radius:12px;text-align:center;margin:18px 0;">
         {otp_code}
       </div>
-      <p style="font-size:12px;color:#64748b;">If you did not request this password reset, you can safely ignore this email.</p>
     </div>
     """
     msg.attach(MIMEText(html_body, "html"))
@@ -58,8 +63,8 @@ def _send_otp_email(to_email: str, full_name: str, otp_code: str) -> bool:
     return True
 
 
-def register_user(data: UserRegister, db: Session) -> User:
-    """Register a new company workspace (Admin) OR create an employee account verified by Admin Passcode."""
+def register_organization(data: OrgRegisterRequest, db: Session) -> User:
+    """Public registration: Creates a new company workspace and its primary Admin."""
     clean_email = data.email.lower().strip()
     if db.query(User).filter(User.email == clean_email).first():
         raise HTTPException(
@@ -68,96 +73,98 @@ def register_user(data: UserRegister, db: Session) -> User:
         )
 
     clean_company = (data.company_name or "").strip()
-    clean_code = (data.company_code or "").strip().upper()
-    passcode = (data.admin_passcode or "").strip()
-
     if not clean_company:
-        raise HTTPException(status_code=400, detail="Organization / Company name is required.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Company / Organization name is required."
+        )
 
-    existing_company_admin = db.query(User).filter(
-        func.lower(User.company_name) == clean_company.lower(),
-        User.role_tier == RoleTier.ADMIN
-    ).first()
-
-    existing_company_user = existing_company_admin or db.query(User).filter(
+    existing_org = db.query(User).filter(
         func.lower(User.company_name) == clean_company.lower()
     ).first()
+    if existing_org:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"'{clean_company}' is already registered on Zenwork. Ask your company Admin to create your employee account."
+        )
 
-    if data.is_new_company:
-        if existing_company_user:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Organization '{clean_company}' already exists. Select 'Create Employee Account (Existing Company)' instead."
-            )
-        if not clean_code:
-            raise HTTPException(status_code=400, detail="Please set a unique Company ID (e.g. ZEN-101).")
-        if len(passcode) < 4:
-            raise HTTPException(status_code=400, detail="Please set an Organization Admin Passcode (min 4 characters) for employee onboarding.")
+    clean_code = (data.company_code or "").strip().upper() or f"ZW-{secrets.randbelow(9000) + 1000}"
 
-        assigned_role = RoleTier.ADMIN
-        canonical_company = clean_company
-        canonical_code = clean_code
-        stored_join_key = hash_password(passcode)
-    else:
-        if not existing_company_user:
-            raise HTTPException(
-                status_code=404,
-                detail=f"No organization found named '{clean_company}'. Ask your company Admin to register the organization first."
-            )
+    admin_user = User(
+        company_name=clean_company,
+        company_code=clean_code,
+        full_name=data.full_name.strip(),
+        email=clean_email,
+        hashed_password=hash_password(data.password),
+        role_tier=RoleTier.ADMIN,
+        designation=data.designation.strip() or "Organization Admin",
+        must_change_password=False
+    )
+    db.add(admin_user)
+    db.commit()
+    db.refresh(admin_user)
+    return admin_user
 
-        # Verify Company ID if set on the organization
-        expected_code = (existing_company_user.company_code or "").strip().upper()
-        if expected_code and clean_code != expected_code:
-            raise HTTPException(
-                status_code=403,
-                detail="Invalid Company ID for this organization."
-            )
 
-        # Verify Organization Admin Passcode
-        admin_with_key = db.query(User).filter(
-            func.lower(User.company_name) == clean_company.lower(),
-            User.admin_join_key.isnot(None)
-        ).first()
-
-        if admin_with_key and admin_with_key.admin_join_key:
-            if not passcode or not verify_password(passcode, admin_with_key.admin_join_key):
-                raise HTTPException(
-                    status_code=403,
-                    detail="Invalid Organization Admin Passcode. Please ask your company Admin for the onboarding passcode."
-                )
-
-        canonical_company = existing_company_user.company_name
-        canonical_code = expected_code or clean_code or None
-        stored_join_key = None
-        assigned_role = RoleTier.MEMBER if data.role_tier == RoleTier.ADMIN else data.role_tier
+def create_employee_by_admin(data: AdminInviteEmployeeRequest, admin_user: User, db: Session):
+    """Admin-only: Onboards an employee into the Admin's company with a temporary password."""
+    clean_email = data.email.lower().strip()
+    if db.query(User).filter(User.email == clean_email).first():
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="This employee email is already registered."
+        )
 
     if data.manager_id:
         manager = db.query(User).filter(
             User.id == data.manager_id,
-            User.company_name == canonical_company
+            User.company_name == admin_user.company_name
         ).first()
         if not manager:
-            raise HTTPException(status_code=404, detail="Reporting manager not found in your organization.")
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Reporting manager not found in your organization."
+            )
+        if manager.role_tier not in [RoleTier.MANAGER, RoleTier.ADMIN]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Selected reporting manager does not have approval permissions."
+            )
 
-    new_user = User(
-        company_name=canonical_company,
-        company_code=canonical_code,
-        admin_join_key=stored_join_key,
+    raw_temp_password = (data.temp_password or "").strip() or _generate_temp_password(10)
+    assigned_role = RoleTier.MEMBER if data.role_tier == RoleTier.ADMIN else data.role_tier
+
+    employee = User(
+        company_name=admin_user.company_name,
+        company_code=admin_user.company_code,
         full_name=data.full_name.strip(),
         email=clean_email,
-        hashed_password=hash_password(data.password),
+        hashed_password=hash_password(raw_temp_password),
         role_tier=assigned_role,
         designation=data.designation.strip() or "Team Member",
-        manager_id=data.manager_id
+        manager_id=data.manager_id,
+        must_change_password=True
     )
-    db.add(new_user)
+    db.add(employee)
     db.commit()
-    db.refresh(new_user)
-    return new_user
+    db.refresh(employee)
 
-    
+    return {
+        "employee": {
+            "id": employee.id,
+            "company_name": employee.company_name,
+            "company_code": employee.company_code,
+            "full_name": employee.full_name,
+            "email": employee.email,
+            "role_tier": employee.role_tier.value,
+            "designation": employee.designation,
+            "manager_id": employee.manager_id
+        },
+        "temp_password": raw_temp_password
+    }
+
+
 def authenticate_user(data: UserLogin, db: Session):
-    """Authenticate a user and generate a JWT access token."""
     user = db.query(User).filter(User.email == data.email.lower().strip()).first()
     if not user or not verify_password(data.password, user.hashed_password):
         raise HTTPException(
@@ -170,14 +177,15 @@ def authenticate_user(data: UserLogin, db: Session):
 
 
 def build_org_tree(user: User):
-    """Build hierarchical org tree scoped strictly to the same company."""
     return {
         "id": user.id,
         "company_name": user.company_name,
+        "company_code": user.company_code,
         "full_name": user.full_name,
         "email": user.email,
         "role_tier": user.role_tier,
         "designation": user.designation,
+        "avatar_url": user.avatar_url,
         "subordinates": [
             build_org_tree(sub)
             for sub in user.subordinates
@@ -187,26 +195,22 @@ def build_org_tree(user: User):
 
 
 def change_user_password(data: ChangePasswordRequest, current_user: User, db: Session):
-    """Verify current password and update to a new password."""
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Current password is incorrect."
+            detail="Current / temporary password is incorrect."
         )
     current_user.hashed_password = hash_password(data.new_password)
+    current_user.must_change_password = False
     db.commit()
-    return {"message": "Password verified and updated successfully!"}
+    return {"message": "Personal password updated successfully!"}
 
 
 def initiate_password_reset_otp(data: SendOtpRequest, db: Session):
-    """Generate a 6-digit OTP and send it to the user's registered email."""
     clean_email = data.email.lower().strip()
     user = db.query(User).filter(User.email == clean_email).first()
     if not user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No workspace account found with this email."
-        )
+        raise HTTPException(status_code=404, detail="No workspace account found with this email.")
 
     otp_code = f"{random.randint(100000, 999999)}"
     PASSWORD_RESET_OTPS[clean_email] = {
@@ -217,10 +221,7 @@ def initiate_password_reset_otp(data: SendOtpRequest, db: Session):
     try:
         sent = _send_otp_email(clean_email, user.full_name, otp_code)
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Failed to send OTP email: {str(e)}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to send OTP email: {str(e)}")
 
     if sent:
         return {"message": f"A 6-digit verification OTP has been sent to {clean_email}.", "email_sent": True}
@@ -233,35 +234,23 @@ def initiate_password_reset_otp(data: SendOtpRequest, db: Session):
 
 
 def complete_password_reset_with_otp(data: VerifyOtpResetRequest, db: Session):
-    """Verify the 6-digit OTP and reset the user's password."""
     clean_email = data.email.lower().strip()
     record = PASSWORD_RESET_OTPS.get(clean_email)
 
     if not record:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Please request an OTP first."
-        )
-
+        raise HTTPException(status_code=400, detail="Please request an OTP first.")
     if datetime.now(timezone.utc) > record["expires_at"]:
         PASSWORD_RESET_OTPS.pop(clean_email, None)
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="OTP has expired. Please request a new one."
-        )
-
+        raise HTTPException(status_code=400, detail="OTP has expired. Please request a new one.")
     if record["otp"] != data.otp.strip():
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid 6-digit OTP. Please check and try again."
-        )
+        raise HTTPException(status_code=400, detail="Invalid 6-digit OTP.")
 
     user = db.query(User).filter(User.email == clean_email).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User account not found.")
+        raise HTTPException(status_code=404, detail="User account not found.")
 
     user.hashed_password = hash_password(data.new_password)
+    user.must_change_password = False
     db.commit()
     PASSWORD_RESET_OTPS.pop(clean_email, None)
-
     return {"message": "OTP verified! Password updated successfully. Please sign in."}

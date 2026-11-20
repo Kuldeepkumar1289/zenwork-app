@@ -84,6 +84,29 @@ async function renderAdminSection() {
     await loadAdminDashboardData();
 }
 
+async function handleAdminCreateEmployee(e) {
+  e.preventDefault();
+  const payload = {
+    company_name: currentUser.company_name,
+    is_new_company: false,
+    full_name: document.getElementById("admEmpName").value.trim(),
+    email: document.getElementById("admEmpEmail").value.trim(),
+    designation: document.getElementById("admEmpDesignation").value.trim() || "Team Member",
+    role_tier: document.getElementById("admEmpRole").value,
+    manager_id: document.getElementById("admEmpManager").value ? parseInt(document.getElementById("admEmpManager").value) : null,
+    password: document.getElementById("admEmpPassword").value
+  };
+
+  try {
+    await apiRequest("/users/admin/create-employee", "POST", payload);
+    if (typeof showToast === "function") showToast(`Employee ${payload.full_name} added to ${currentUser.company_name}!`, "success");
+    e.target.reset();
+    if (typeof renderAdminSection === "function") renderAdminSection();
+  } catch (err) {
+    if (typeof showToast === "function") showToast(err.message || "Failed to create employee.", "error");
+  }
+}
+
 async function loadAdminDashboardData() {
     try {
         const [overview, orgTree] = await Promise.all([

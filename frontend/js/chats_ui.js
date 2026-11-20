@@ -859,6 +859,7 @@ function drawChats(scrollToBottom = true) {
     const bottomBarHtml = isRecording
       ? `<div class="chat-compose flex items-center justify-between flex-wrap gap-2" style="background:#FFF1F2;">
            <div class="flex items-center gap-2 text-xs font-semibold text-red-600">
+             <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
              <span>Recording Voice Note...</span>
              <span id="voiceTimerText">0:${String(dmRecordSeconds).padStart(2, "0")}</span>
            </div>
@@ -867,16 +868,37 @@ function drawChats(scrollToBottom = true) {
              <button type="button" onclick="stopAndSendVoiceRecording()" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">Send Voice</button>
            </div>
          </div>`
-      : `<form class="chat-compose flex-wrap" onsubmit="sendChat(event)">
+      : `<form class="chat-compose" onsubmit="sendChat(event)" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
            <input type="file" id="chatFileInput" class="hidden"
              accept="image/*,audio/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv,.zip"
              onchange="handleChatFileSelected(event)">
-           <button type="button" onclick="triggerChatFilePicker()" class="btn btn-ghost"
-             style="padding:7px 11px;font-size:12px;font-weight:600;" title="Attach Image, PDF, or File">+ Attach</button>
-           <button type="button" onclick="startVoiceRecording()" class="btn btn-ghost"
-             style="padding:7px 11px;font-size:12px;font-weight:600;" title="Record Voice Note">Voice</button>
-           <input id="chatInput" style="min-width:140px;" placeholder="Message ${esc(active.name)}..." autocomplete="off">
-           <button type="submit" id="chatSendBtn" class="btn btn-primary">Send</button>
+
+           <div style="flex:1;display:flex;align-items:center;gap:4px;background:#FFFFFF;border:1px solid var(--line, #CBD5E1);border-radius:999px;padding:4px 8px 4px 14px;">
+             <input id="chatInput"
+               style="flex:1;min-width:0;border:none;outline:none;background:transparent;font-size:13px;padding:6px 4px;"
+               placeholder="Message ${esc(active.name)}..." autocomplete="off">
+
+             <button type="button" onclick="triggerChatFilePicker()"
+               style="width:32px;height:32px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;flex-shrink:0;"
+               class="hover:bg-gray-100 transition" title="Attach Image, PDF, or File">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+               </svg>
+             </button>
+
+             <button type="button" onclick="startVoiceRecording()"
+               style="width:32px;height:32px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;flex-shrink:0;"
+               class="hover:bg-gray-100 transition" title="Record Voice Note">
+               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
+                 <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
+                 <line x1="12" y1="19" x2="12" y2="23"/>
+                 <line x1="8" y1="23" x2="16" y2="23"/>
+               </svg>
+             </button>
+           </div>
+
+           <button type="submit" id="chatSendBtn" class="btn btn-primary" style="flex-shrink:0;border-radius:999px;padding:9px 18px;">Send</button>
          </form>`;
 
     mainPaneHtml = `

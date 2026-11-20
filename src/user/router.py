@@ -27,7 +27,6 @@ from src.user.models import RoleTier, User
 from src.utils.db import engine, get_db
 from src.utils.dependencies import get_current_user
 
-# Safe one-time schema check so TiDB Cloud adds company_name automatically if missing
 try:
     with engine.begin() as conn:
         conn.execute(text(
@@ -39,13 +38,34 @@ except Exception:
 user_router = APIRouter(prefix="/users", tags=["Authentication & Hierarchy"])
 
 
-@user_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Register a new user or company workspace")
+@user_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Register a new Organization workspace (Admin)")
 def register(data: UserRegister, db: Session = Depends(get_db)):
-    if not data.is_new_company and data.role_tier == RoleTier.ADMIN:
+    """Only an Organization can register a new workspace. Employees are created by their Organization Admin."""
+    if not data.is_new_company:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin role is granted automatically when creating a new company workspace."
+            detail="Employees cannot self-register. Ask your Organization Admin to create your employee account."
         )
+    data.role_tier = RoleTier.ADMIN
+    return register_user(data=data, db=db)
+
+
+@user_router.post("/admin/create-employee", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Organization Admin creates a new employee account")
+def admin_create_employee(
+    data: UserRegister,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Creates a new employee strictly locked inside the Admin's own organization."""
+    if current_user.role_tier != RoleTier.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only an Organization Admin can create new employee accounts."
+        )
+    data.is_new_company = False
+    data.company_name = current_user.company_name
+    if data.role_tier == RoleTier.ADMIN:
+        data.role_tier = RoleTier.MEMBER
     return register_user(data=data, db=db)
 
 

@@ -54,40 +54,45 @@ function toggleAuthMode(mode) {
   document.getElementById("registerForm").classList.toggle("hidden", !isRegister);
 
   document.getElementById("formHeading").textContent =
-    isRegister ? "Create your workspace account" : "Welcome back";
+    isRegister ? "Register your organization" : "Welcome back";
   document.getElementById("formSubheading").textContent =
-    isRegister ? "Create a new company workspace or join your existing team."
+    isRegister ? "Create a company workspace first, then add employees inside Admin Control."
                : "Sign in to access your tasks, attendance, and team workspace.";
   document.getElementById("toggleText").innerHTML = isRegister
-    ? `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
-    : `Don't have an account? <button type="button" onclick="toggleAuthMode('register')" class="link">Sign up</button>`;
+    ? `Already registered? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
+    : `New organization? <button type="button" onclick="toggleAuthMode('register')" class="link">Register organization</button>`;
 }
 
-function toggleForgotPanel(showForgot) {
-  document.getElementById("alertBox").classList.add("hidden");
-  document.getElementById("registerForm").classList.add("hidden");
-  document.getElementById("loginForm").classList.toggle("hidden", showForgot);
-  document.getElementById("forgotForm").classList.toggle("hidden", !showForgot);
+/* Organization Sign Up */
+document.getElementById("registerForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById("regSubmitBtn");
+  btn.disabled = true;
+  btn.textContent = "Creating organization...";
 
-  // Reset OTP step state whenever opened
-  const otpFields = document.getElementById("otpVerifyFields");
-  const submitBtn = document.getElementById("forgotSubmitBtn");
-  const emailInput = document.getElementById("forgotEmail");
-  const sendBtn = document.getElementById("sendOtpBtn");
-  if (otpFields) otpFields.classList.add("hidden");
-  if (emailInput) emailInput.readOnly = false;
-  if (sendBtn) sendBtn.textContent = "Send OTP";
-  if (submitBtn) {
-    submitBtn.disabled = true;
-    submitBtn.classList.add("opacity-60", "cursor-not-allowed");
+  try {
+    const companyName = document.getElementById("regCompanyName").value.trim();
+
+    await apiRequest("/users/register", "POST", {
+      company_name:   companyName,
+      is_new_company: true,
+      full_name:      document.getElementById("regName").value.trim(),
+      email:          document.getElementById("regEmail").value.trim(),
+      designation:    document.getElementById("regDesignation").value.trim() || "Organization Admin",
+      role_tier:      "ADMIN",
+      password:       document.getElementById("regPassword").value
+    });
+
+    showAlert(`Organization "${companyName}" registered! Sign in as Admin to create employee accounts.`, false);
+    document.getElementById("registerForm").reset();
+    setTimeout(() => toggleAuthMode("login"), 1400);
+  } catch (err) {
+    showAlert(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Register Organization →";
   }
-
-  document.getElementById("formHeading").textContent =
-    showForgot ? "Reset password" : "Welcome back";
-  document.getElementById("formSubheading").textContent =
-    showForgot ? "Verify your registered work email with a 6-digit OTP."
-               : "Sign in to access your tasks, attendance, and team workspace.";
-}
+});
 
 /* Step 1: Request 6-Digit Email OTP */
 async function requestResetOtp() {

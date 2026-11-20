@@ -191,7 +191,7 @@ async function loadAdminDashboardData() {
             const isSelf = u.id === currentUser.id;
             return `
                 <tr class="hover:bg-[#F9FBFA]">
-                    <td class="py-3 text-gray-400 font-mono">#${u.id}</td>
+                    <td class="py-3 text-gray-400 font-mono">#${parseInt(u.id, 10) || u.id}</td>
                     <td class="py-3">
                         <p class="font-semibold text-gray-900">${u.full_name} ${isSelf ? '<span class="text-[10px] text-[#1E6B52]">(You)</span>' : ''}</p>
                         <p class="text-[11px] text-gray-400">${u.email}</p>

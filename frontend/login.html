@@ -178,33 +178,65 @@
         </div>
       </form>
       
-      <!-- 3. ORGANIZATION REGISTRATION FORM (ADMIN ONLY) -->
-      <form id="registerForm" class="hidden space-y-3.5">
-        <div class="p-3 rounded-xl text-xs" style="background: rgba(29, 107, 82, 0.1); border: 1px solid var(--line); color: var(--ink);">
-          <b>Organization Registration:</b> Create your company workspace here. Once signed in, use <b>Admin Control</b> to add employees under your organization.
-        </div>
+      <!-- 3. MULTI-COMPANY ORGANIZATION & EMPLOYEE SIGN UP FORM -->
+      <form id="registerForm" class="hidden space-y-3">
         <div>
-          <label class="block text-xs font-semibold mb-1">Organization / Company Name</label>
-          <input type="text" id="regCompanyName" required placeholder="e.g. Zentrix Technologies" class="day-input">
+          <label class="block text-xs font-semibold mb-1">Account Type</label>
+          <select id="regCompanyMode" class="day-input" onchange="handleCompanyModeChange(this.value)">
+            <option value="join">Employee Account (Join Existing Organization)</option>
+            <option value="create">New Organization Workspace (Company Admin)</option>
+          </select>
         </div>
-        <div>
-          <label class="block text-xs font-semibold mb-1">Organization Admin Full Name</label>
-          <input type="text" id="regName" required placeholder="Alex Morgan" class="day-input">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Organization Name</label>
+            <input type="text" id="regCompanyName" required placeholder="e.g. Zenwork Studio" class="day-input">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Company ID</label>
+            <input type="text" id="regCompanyCode" required placeholder="e.g. ZEN-101" class="day-input" style="text-transform:uppercase;">
+          </div>
         </div>
+
         <div>
-          <label class="block text-xs font-semibold mb-1">Admin Work Email</label>
-          <input type="email" id="regEmail" required placeholder="admin@company.com" class="day-input">
+          <label id="adminPasscodeLabel" class="block text-xs font-semibold mb-1">Organization Admin Passcode (Required)</label>
+          <input type="password" id="regAdminPasscode" required minlength="4" placeholder="Enter Admin onboarding passcode" class="day-input">
+          <small id="adminPasscodeHint" class="block text-[11px] muted mt-0.5">Provided by your company Admin to verify your organization.</small>
         </div>
-        <div>
-          <label class="block text-xs font-semibold mb-1">Designation</label>
-          <input type="text" id="regDesignation" required value="Organization Admin" placeholder="Founder & Admin" class="day-input">
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Full Name</label>
+            <input type="text" id="regName" required placeholder="Alex Morgan" class="day-input">
+          </div>
+          <div>
+            <label class="block text-xs font-semibold mb-1">Work Email</label>
+            <input type="email" id="regEmail" required placeholder="alex@company.com" class="day-input">
+          </div>
         </div>
+
+        <div class="grid grid-cols-2 gap-2.5">
+          <div>
+            <label class="block text-xs font-semibold mb-1">Designation</label>
+            <input type="text" id="regDesignation" required placeholder="Software Engineer" class="day-input">
+          </div>
+          <div id="regRoleSelectWrap">
+            <label class="block text-xs font-semibold mb-1">Role Tier</label>
+            <select id="regRole" class="day-input">
+              <option value="MEMBER">Member</option>
+              <option value="MANAGER">Manager</option>
+            </select>
+          </div>
+        </div>
+
         <div>
-          <label class="block text-xs font-semibold mb-1">Password</label>
+          <label class="block text-xs font-semibold mb-1">Account Login Password</label>
           <input type="password" id="regPassword" required minlength="6" placeholder="Min 6 characters" class="day-input">
         </div>
+
         <button type="submit" id="regSubmitBtn" class="btn btn-primary wide" style="padding: 12px; font-size: 14px;">
-          Register Organization →
+          Create Account →
         </button>
       </form>
 

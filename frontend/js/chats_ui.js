@@ -1,5 +1,5 @@
 /* chats_ui.js — Structured Notice Board, Unread Alerts,
-   Live Toast Notifications, Files/Media & Voice DMs */
+   Live Toast Notifications, Files/Media & Audio Notes */
 
 let chatThreads = [];
 let chatActive = null;
@@ -125,7 +125,7 @@ function showIncomingMessageToast(partnerId, senderName, text, timeStr) {
     max-width: calc(100vw - 32px);
     background: #FFFFFF;
     border: 1px solid #CBD5E1;
-    border-left: 4px solid var(--accent, #4F46E5);
+    border-left: 4px solid var(--accent, #1d6b52);
     border-radius: 16px;
     box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
     padding: 13px 15px;
@@ -134,7 +134,7 @@ function showIncomingMessageToast(partnerId, senderName, text, timeStr) {
   `;
   toast.innerHTML = `
     <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:4px;">
-      <span style="font-size:11px;font-weight:700;color:var(--accent, #4F46E5);text-transform:uppercase;letter-spacing:.04em;">
+      <span style="font-size:11px;font-weight:700;color:var(--accent, #1d6b52);text-transform:uppercase;letter-spacing:.04em;">
         New Message • ${esc(timeStr)}
       </span>
       <button type="button" onclick="document.getElementById('zenChatToast')?.remove()"
@@ -146,7 +146,7 @@ function showIncomingMessageToast(partnerId, senderName, text, timeStr) {
     </div>
     <div style="margin-top:10px;display:flex;justify-content:flex-end;">
       <button type="button" id="zenToastOpenBtn"
-        style="padding:5px 12px;border-radius:9px;background:var(--accent, #4F46E5);color:#fff;font-size:11px;font-weight:600;cursor:pointer;">
+        style="padding:5px 12px;border-radius:9px;background:var(--accent, #1d6b52);color:#fff;font-size:11px;font-weight:600;cursor:pointer;">
         Open Chat
       </button>
     </div>
@@ -604,16 +604,16 @@ function stopAndSendVoiceRecording() {
     drawChats(false);
 
     try {
-      const mediaUrl = await uploadFileToBackend(blob, `voice_note_${Date.now()}.webm`);
+      const mediaUrl = await uploadFileToBackend(blob, `audio_note_${Date.now()}.webm`);
       await apiRequest("/communications/chat/messages", "POST", {
         receiver_id: thread.userId,
-        message_text: `Voice note (${dmRecordSeconds}s)`,
+        message_text: `Audio note (${dmRecordSeconds}s)`,
         attachment_url: mediaUrl
       });
       await loadDmHistory(thread.id);
       drawChats(true);
     } catch (err) {
-      alert("Voice note upload failed: " + chatErrMsg(err));
+      alert("Audio note upload failed: " + chatErrMsg(err));
     }
   };
   dmRecorder.stop();
@@ -639,7 +639,7 @@ function renderAttachmentBlock(rawUrl, fallbackName, isMine) {
   if (!rawUrl) return "";
   const fullUrl = resolveMediaUrl(rawUrl);
   const cleanPath = rawUrl.split("?")[0].toLowerCase();
-  const safeFileName = (fallbackName && !fallbackName.startsWith("Voice note"))
+  const safeFileName = (fallbackName && !fallbackName.startsWith("Audio note") && !fallbackName.startsWith("Voice note"))
     ? fallbackName
     : (rawUrl.split("/").pop() || "download");
 
@@ -835,7 +835,7 @@ function drawChats(scrollToBottom = true) {
             ${renderAttachmentBlock(m.attachmentUrl, m.text, m.mine)}
             <small>${formatChatLocalTime(m.at)}</small>
           </div>`).join("")
-      : emptyState(`Send a message, file, or voice note to ${active.name}.`);
+      : emptyState(`Send a message, file, or audio note to ${active.name}.`);
 
     const attachmentPreviewBar = pendingAttachment
       ? `<div class="flex items-center justify-between gap-2 px-3.5 py-2 bg-gray-50 border-t border-gray-200 text-xs">
@@ -860,12 +860,12 @@ function drawChats(scrollToBottom = true) {
       ? `<div class="chat-compose flex items-center justify-between flex-wrap gap-2" style="background:#FFF1F2;">
            <div class="flex items-center gap-2 text-xs font-semibold text-red-600">
              <span class="w-2 h-2 rounded-full bg-red-600 animate-ping"></span>
-             <span>Recording Voice Note...</span>
+             <span>Recording Audio Note...</span>
              <span id="voiceTimerText">0:${String(dmRecordSeconds).padStart(2, "0")}</span>
            </div>
            <div class="flex items-center gap-2">
              <button type="button" onclick="cancelVoiceRecording()" class="btn btn-ghost" style="padding:6px 12px;font-size:12px;">Cancel</button>
-             <button type="button" onclick="stopAndSendVoiceRecording()" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">Send Voice</button>
+             <button type="button" onclick="stopAndSendVoiceRecording()" class="btn btn-primary" style="padding:6px 14px;font-size:12px;">Send Audio</button>
            </div>
          </div>`
       : `<form class="chat-compose" onsubmit="sendChat(event)" style="display:flex;align-items:center;gap:8px;padding:10px 14px;">
@@ -888,7 +888,7 @@ function drawChats(scrollToBottom = true) {
 
              <button type="button" onclick="startVoiceRecording()"
                style="width:32px;height:32px;border-radius:999px;display:inline-flex;align-items:center;justify-content:center;color:#475569;cursor:pointer;flex-shrink:0;"
-               class="hover:bg-gray-100 transition" title="Record Voice Note">
+               class="hover:bg-gray-100 transition" title="Record Audio Note">
                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                  <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"/>
                  <path d="M19 10v2a7 7 0 0 1-14 0v-2"/>
@@ -910,7 +910,7 @@ function drawChats(scrollToBottom = true) {
             <span class="block text-[11px] muted">${esc(active.sub || "Workspace Member")}</span>
           </div>
         </div>
-        <span class="text-[11px] muted">Files • Media • Voice</span>
+        <span class="text-[11px] muted">Files • Media • Audio Notes</span>
       </div>
       <div class="chat-msgs" id="chatMsgs">${bubbles}</div>
       ${statusPill}
@@ -919,7 +919,7 @@ function drawChats(scrollToBottom = true) {
   }
 
   setSection(`
-    ${pageHead("Chats", "Structured workspace announcements, media sharing, and voice messages.")}
+    ${pageHead("Chats", "Structured workspace announcements, media sharing, and audio notes.")}
     ${invitesBanner}
     <div class="card glass chat">
       <aside class="chat-list">

@@ -5,6 +5,8 @@ from src.user.models import RoleTier
 
 class UserRegister(BaseModel):
     company_name: str = "Zenwork Studio"
+    company_code: Optional[str] = None          # e.g., ZEN-101 (Company ID)
+    admin_passcode: Optional[str] = None        # Set by Admin on creation; verified when employee joins
     is_new_company: bool = False
     full_name: str
     email: EmailStr
@@ -22,6 +24,7 @@ class UserLogin(BaseModel):
 class UserResponse(BaseModel):
     id: int
     company_name: str
+    company_code: Optional[str] = None
     full_name: str
     email: EmailStr
     role_tier: RoleTier
@@ -40,6 +43,7 @@ class TokenResponse(BaseModel):
 class OrgNodeResponse(BaseModel):
     id: int
     company_name: str
+    company_code: Optional[str] = None
     full_name: str
     email: EmailStr
     role_tier: RoleTier

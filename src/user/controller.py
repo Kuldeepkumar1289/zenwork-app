@@ -59,41 +59,76 @@ def _send_otp_email(to_email: str, full_name: str, otp_code: str) -> bool:
 
 
 def register_user(data: UserRegister, db: Session) -> User:
-    """Register a new user or create a new company workspace."""
+    """Register a new company workspace (Admin) OR create an employee account verified by Admin Passcode."""
     clean_email = data.email.lower().strip()
-    existing_user = db.query(User).filter(User.email == clean_email).first()
-    if existing_user:
+    if db.query(User).filter(User.email == clean_email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This work email is already registered."
         )
 
     clean_company = (data.company_name or "").strip()
-    if not clean_company:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Company / Workspace name is required."
-        )
+    clean_code = (data.company_code or "").strip().upper()
+    passcode = (data.admin_passcode or "").strip()
 
-    existing_company_user = db.query(User).filter(
+    if not clean_company:
+        raise HTTPException(status_code=400, detail="Organization / Company name is required.")
+
+    existing_company_admin = db.query(User).filter(
+        func.lower(User.company_name) == clean_company.lower(),
+        User.role_tier == RoleTier.ADMIN
+    ).first()
+
+    existing_company_user = existing_company_admin or db.query(User).filter(
         func.lower(User.company_name) == clean_company.lower()
     ).first()
 
     if data.is_new_company:
         if existing_company_user:
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Workspace '{clean_company}' already exists. Select 'Join Existing Company Workspace' instead."
+                status_code=400,
+                detail=f"Organization '{clean_company}' already exists. Select 'Create Employee Account (Existing Company)' instead."
             )
+        if not clean_code:
+            raise HTTPException(status_code=400, detail="Please set a unique Company ID (e.g. ZEN-101).")
+        if len(passcode) < 4:
+            raise HTTPException(status_code=400, detail="Please set an Organization Admin Passcode (min 4 characters) for employee onboarding.")
+
         assigned_role = RoleTier.ADMIN
         canonical_company = clean_company
+        canonical_code = clean_code
+        stored_join_key = hash_password(passcode)
     else:
         if not existing_company_user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"No company workspace found named '{clean_company}'. Check the spelling or create a new company."
+                status_code=404,
+                detail=f"No organization found named '{clean_company}'. Ask your company Admin to register the organization first."
             )
+
+        # Verify Company ID if set on the organization
+        expected_code = (existing_company_user.company_code or "").strip().upper()
+        if expected_code and clean_code != expected_code:
+            raise HTTPException(
+                status_code=403,
+                detail="Invalid Company ID for this organization."
+            )
+
+        # Verify Organization Admin Passcode
+        admin_with_key = db.query(User).filter(
+            func.lower(User.company_name) == clean_company.lower(),
+            User.admin_join_key.isnot(None)
+        ).first()
+
+        if admin_with_key and admin_with_key.admin_join_key:
+            if not passcode or not verify_password(passcode, admin_with_key.admin_join_key):
+                raise HTTPException(
+                    status_code=403,
+                    detail="Invalid Organization Admin Passcode. Please ask your company Admin for the onboarding passcode."
+                )
+
         canonical_company = existing_company_user.company_name
+        canonical_code = expected_code or clean_code or None
+        stored_join_key = None
         assigned_role = RoleTier.MEMBER if data.role_tier == RoleTier.ADMIN else data.role_tier
 
     if data.manager_id:
@@ -102,18 +137,12 @@ def register_user(data: UserRegister, db: Session) -> User:
             User.company_name == canonical_company
         ).first()
         if not manager:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="Reporting manager not found in your company workspace."
-            )
-        if manager.role_tier not in [RoleTier.MANAGER, RoleTier.ADMIN]:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Assigned manager does not have approval permissions."
-            )
+            raise HTTPException(status_code=404, detail="Reporting manager not found in your organization.")
 
     new_user = User(
         company_name=canonical_company,
+        company_code=canonical_code,
+        admin_join_key=stored_join_key,
         full_name=data.full_name.strip(),
         email=clean_email,
         hashed_password=hash_password(data.password),
@@ -126,7 +155,7 @@ def register_user(data: UserRegister, db: Session) -> User:
     db.refresh(new_user)
     return new_user
 
-
+    
 def authenticate_user(data: UserLogin, db: Session):
     """Authenticate a user and generate a JWT access token."""
     user = db.query(User).filter(User.email == data.email.lower().strip()).first()

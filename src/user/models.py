@@ -14,6 +14,8 @@ class User(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     company_name = Column(String(120), nullable=False, index=True, default="Zenwork Studio")
+    company_code = Column(String(40), nullable=True, index=True)
+    admin_join_key = Column(String(255), nullable=True)  # Hashed company passcode set by Admin
     full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)

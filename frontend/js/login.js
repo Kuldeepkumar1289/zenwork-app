@@ -36,12 +36,22 @@ function togglePassVisibility(inputId, btn) {
 function handleCompanyModeChange(mode) {
   const roleWrap = document.getElementById("regRoleSelectWrap");
   const desigInput = document.getElementById("regDesignation");
+  const passLabel = document.getElementById("adminPasscodeLabel");
+  const passInput = document.getElementById("regAdminPasscode");
+  const passHint = document.getElementById("adminPasscodeHint");
+
   if (mode === "create") {
     if (roleWrap) roleWrap.classList.add("hidden");
-    if (desigInput && !desigInput.value) desigInput.value = "Founder & Admin";
+    if (desigInput && !desigInput.value) desigInput.value = "Organization Admin";
+    if (passLabel) passLabel.textContent = "Set Organization Admin Passcode";
+    if (passInput) passInput.placeholder = "Create passcode for your employees (min 4 chars)";
+    if (passHint) passHint.textContent = "Share this Company ID & Admin Passcode with your employees so they can create their accounts.";
   } else {
     if (roleWrap) roleWrap.classList.remove("hidden");
-    if (desigInput && desigInput.value === "Founder & Admin") desigInput.value = "";
+    if (desigInput && desigInput.value === "Organization Admin") desigInput.value = "";
+    if (passLabel) passLabel.textContent = "Organization Admin Passcode (Required)";
+    if (passInput) passInput.placeholder = "Enter Admin onboarding passcode";
+    if (passHint) passHint.textContent = "Provided by your company Admin to lock your account to this organization.";
   }
 }
 
@@ -54,43 +64,53 @@ function toggleAuthMode(mode) {
   document.getElementById("registerForm").classList.toggle("hidden", !isRegister);
 
   document.getElementById("formHeading").textContent =
-    isRegister ? "Register your organization" : "Welcome back";
+    isRegister ? "Create your workspace account" : "Welcome back";
   document.getElementById("formSubheading").textContent =
-    isRegister ? "Create a company workspace first, then add employees inside Admin Control."
+    isRegister ? "Register a new organization or join your company using your Company ID & Admin Passcode."
                : "Sign in to access your tasks, attendance, and team workspace.";
   document.getElementById("toggleText").innerHTML = isRegister
-    ? `Already registered? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
-    : `New organization? <button type="button" onclick="toggleAuthMode('register')" class="link">Register organization</button>`;
+    ? `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
+    : `Don't have an account? <button type="button" onclick="toggleAuthMode('register')" class="link">Sign up</button>`;
 }
 
-/* Organization Sign Up */
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("regSubmitBtn");
   btn.disabled = true;
-  btn.textContent = "Creating organization...";
+  btn.textContent = "Creating account...";
 
   try {
+    const modeEl = document.getElementById("regCompanyMode");
+    const isNewCompany = modeEl ? modeEl.value === "create" : false;
     const companyName = document.getElementById("regCompanyName").value.trim();
+    const companyCode = document.getElementById("regCompanyCode").value.trim().toUpperCase();
 
     await apiRequest("/users/register", "POST", {
       company_name:   companyName,
-      is_new_company: true,
+      company_code:   companyCode,
+      admin_passcode: document.getElementById("regAdminPasscode").value.trim(),
+      is_new_company: isNewCompany,
       full_name:      document.getElementById("regName").value.trim(),
       email:          document.getElementById("regEmail").value.trim(),
-      designation:    document.getElementById("regDesignation").value.trim() || "Organization Admin",
-      role_tier:      "ADMIN",
+      designation:    document.getElementById("regDesignation").value.trim() || "Team Member",
+      role_tier:      isNewCompany ? "ADMIN" : document.getElementById("regRole").value,
       password:       document.getElementById("regPassword").value
     });
 
-    showAlert(`Organization "${companyName}" registered! Sign in as Admin to create employee accounts.`, false);
+    showAlert(
+      isNewCompany
+        ? `Organization "${companyName}" (${companyCode}) created! Sign in now.`
+        : `Account created under "${companyName}" (${companyCode})! Sign in now.`,
+      false
+    );
     document.getElementById("registerForm").reset();
-    setTimeout(() => toggleAuthMode("login"), 1400);
+    handleCompanyModeChange("join");
+    setTimeout(() => toggleAuthMode("login"), 1500);
   } catch (err) {
     showAlert(err.message, true);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Register Organization →";
+    btn.textContent = "Create Account →";
   }
 });
 

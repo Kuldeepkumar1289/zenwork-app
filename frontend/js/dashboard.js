@@ -105,7 +105,9 @@ function updateProfileUI(user) {
     const topAvatar = document.getElementById("topAvatar");
     if (topAvatar) {
         if (user.avatar_url && typeof resolveAvatarSrc === "function") {
-            topAvatar.innerHTML = `<img src="${resolveAvatarSrc(user.avatar_url)}" alt="${user.full_name}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+            topAvatar.style.overflow = "hidden";
+            topAvatar.style.padding = "0";
+            topAvatar.innerHTML = `<img src="${resolveAvatarSrc(user.avatar_url)}" alt="${user.full_name}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
         } else {
             topAvatar.textContent = firstName[0].toUpperCase();
         }

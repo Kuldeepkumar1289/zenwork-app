@@ -1,30 +1,30 @@
-from datetime import datetime, timezone, date
-from typing import Optional
-from sqlalchemy.orm import Session
-from fastapi import HTTPException, status, Request
-from math import radians, sin, cos, sqrt, atan2
 from calendar import monthrange
+from datetime import date, datetime, timedelta, timezone
+from math import atan2, cos, radians, sin, sqrt
+from typing import Optional
+
+from fastapi import HTTPException, Request, status
 from sqlalchemy import func, or_
+from sqlalchemy.orm import Session
 
-
-from src.attendance.models import (
-    Attendance,
-    AttendanceStatus,
-    AttendanceRegularization,
-    RegularizationStatus,
-    LeaveRequest, 
-    LeaveRequestStatus, 
-    LeaveType
-)
 from src.attendance.dtos import (
     PunchInRequest,
     PunchOutRequest,
-    TeamAttendanceReport,
     RegularizationCreateRequest,
-    RegularizationReviewRequest
+    RegularizationReviewRequest,
+    TeamAttendanceReport
 )
-from src.user.models import User, RoleTier
+from src.attendance.models import (
+    Attendance,
+    AttendanceRegularization,
+    AttendanceStatus,
+    LeaveRequest,
+    LeaveRequestStatus,
+    LeaveType,
+    RegularizationStatus
+)
 from src.tasks.controller import get_subordinate_ids
+from src.user.models import RoleTier, User
 
 # --- GEOFENCING & NETWORK CONFIGURATION ---
 COMPANY_LAT = 28.4595
@@ -69,7 +69,7 @@ def close_stale_previous_shifts(user_id: int, db: Session) -> None:
 
     for rec in stale_records:
         rec.punch_out = datetime.combine(rec.date, datetime.max.time()).replace(microsecond=0)
-        rec.total_hours = 0.0
+        rec.total_hours = float(rec.total_hours or 0.0)
         rec.status = AttendanceStatus.HALF_DAY
         rec.notes = f"{rec.notes or ''} | Auto-closed missed checkout".strip(" |")
 
@@ -97,13 +97,7 @@ def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db
             detail="You are already punched in for today."
         )
 
-    if existing and existing.punch_out is not None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Punch-in already completed and ended for today."
-        )
-
-    # Optional GPS geofence check ONLY when browser actually sends valid coordinates
+    # Optional GPS geofence check ONLY when browser sends valid coordinates
     lat = getattr(data, "latitude", None)
     lng = getattr(data, "longitude", None)
     if lat is not None and lng is not None:
@@ -113,6 +107,15 @@ def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Geofence Error: You are {round(distance)} meters away from the office."
             )
+
+    # If user already checked out earlier today, resume today's row so daily hours accumulate cleanly
+    if existing and existing.punch_out is not None:
+        existing.punch_in = now
+        existing.punch_out = None
+        existing.notes = f"{existing.notes or ''} | Resumed session".strip(" |")
+        db.commit()
+        db.refresh(existing)
+        return existing
 
     record = Attendance(
         user_id=current_user.id,
@@ -149,10 +152,12 @@ def punch_out_user(data: PunchOutRequest, current_user: User, db: Session) -> At
     in_time = _to_naive_utc(record.punch_in) or now
     out_time = _to_naive_utc(record.punch_out) or now
 
-    duration_seconds = (out_time - in_time).total_seconds()
-    hours = round(max(0.0, duration_seconds / 3600.0), 2)
-    record.total_hours = hours
-    record.status = AttendanceStatus.HALF_DAY if hours < 4.5 else AttendanceStatus.PRESENT
+    session_seconds = max(0.0, (out_time - in_time).total_seconds())
+    session_hours = session_seconds / 3600.0
+    cumulative_hours = round(float(record.total_hours or 0.0) + session_hours, 2)
+
+    record.total_hours = cumulative_hours
+    record.status = AttendanceStatus.HALF_DAY if cumulative_hours < 4.5 else AttendanceStatus.PRESENT
 
     if getattr(data, "notes", None):
         record.notes = f"{record.notes or ''} | Out: {data.notes}".strip(" |")
@@ -307,7 +312,7 @@ def review_regularization_request(
 
 
 def get_my_monthly_attendance(month_str: Optional[str], current_user: User, db: Session):
-    """Returns daily check-in/check-out records and summary for the selected YYYY-MM month."""
+    """Returns daily check-in/check-out records and live + saved hours for the selected YYYY-MM month."""
     now = get_utc_now()
     if not month_str or len(month_str) != 7:
         month_str = now.strftime("%Y-%m")
@@ -323,32 +328,42 @@ def get_my_monthly_attendance(month_str: Optional[str], current_user: User, db: 
         Attendance.date <= end_dt
     ).order_by(Attendance.date.desc()).all()
 
-    total_hours = round(sum(float(r.total_hours or 0.0) for r in records), 2)
+    formatted_records = []
+    monthly_total_hours = 0.0
+
+    for r in records:
+        logged_hrs = float(r.total_hours or 0.0)
+        if r.punch_in and not r.punch_out:
+            in_naive = _to_naive_utc(r.punch_in) or now
+            active_hrs = max(0.0, (now - in_naive).total_seconds() / 3600.0)
+            effective_hrs = round(logged_hrs + active_hrs, 2)
+        else:
+            effective_hrs = round(logged_hrs, 2)
+
+        monthly_total_hours += effective_hrs
+        formatted_records.append({
+            "id": r.id,
+            "date": r.date.isoformat(),
+            "punch_in": r.punch_in.isoformat() if r.punch_in else None,
+            "punch_out": r.punch_out.isoformat() if r.punch_out else None,
+            "total_hours": effective_hrs,
+            "status": r.status.value if hasattr(r.status, "value") else str(r.status),
+            "notes": r.notes
+        })
+
     present_days = sum(1 for r in records if r.status in [AttendanceStatus.PRESENT, AttendanceStatus.HALF_DAY])
 
     return {
         "month": month_str,
-        "total_hours": total_hours,
+        "total_hours": round(monthly_total_hours, 2),
         "present_days": present_days,
-        "records": [
-            {
-                "id": r.id,
-                "date": r.date.isoformat(),
-                "punch_in": r.punch_in.isoformat() if r.punch_in else None,
-                "punch_out": r.punch_out.isoformat() if r.punch_out else None,
-                "total_hours": float(r.total_hours or 0.0),
-                "status": r.status.value if hasattr(r.status, "value") else str(r.status),
-                "notes": r.notes
-            }
-            for r in records
-        ]
+        "records": formatted_records
     }
 
 
 def get_company_live_statuses(current_user: User, db: Session):
-    """Returns today's live status for every teammate in the same company (handles NULL/case company_name and active shifts)."""
+    """Returns today's live status for every teammate in the same company."""
     today = get_utc_now().date()
-    yesterday = today - timedelta(days=1)
 
     user_company = (current_user.company_name or "").strip().lower()
     if user_company:
@@ -366,7 +381,6 @@ def get_company_live_statuses(current_user: User, db: Session):
     if not user_ids:
         return {}
 
-    # Fetch today's attendance OR any currently open active shift
     att_rows = db.query(Attendance).filter(
         Attendance.user_id.in_(user_ids),
         or_(
@@ -377,7 +391,6 @@ def get_company_live_statuses(current_user: User, db: Session):
 
     todays_att = {}
     for a in att_rows:
-        # Prefer today's record or an open active shift
         if a.date == today or a.punch_out is None:
             todays_att[a.user_id] = a
 

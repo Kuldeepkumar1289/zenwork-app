@@ -249,12 +249,30 @@ async function loadMonthlyAttendanceHistory(monthStr) {
     const subEl = document.getElementById("monthlySummarySub");
     if (!tbody) return;
 
+    const safeFormatDuration = (hrs) => {
+        if (typeof formatDuration === "function") return formatDuration(hrs);
+        const mins = Math.max(0, Math.round((hrs || 0) * 60));
+        const h = Math.floor(mins / 60);
+        const m = mins % 60;
+        return h > 0 ? `${h}h ${m}m` : `${m} min`;
+    };
+
     try {
         const res = await apiRequest(`/attendance/me/history?month=${encodeURIComponent(monthStr)}`);
         const records = res?.records || [];
 
         if (subEl) {
             subEl.innerHTML = `Total Logged: <b>${res.total_hours || 0} hrs</b> across <b>${res.present_days || 0} working day(s)</b> in ${res.month}.`;
+        }
+
+        // Sync Today's Shift KPI card with exact live/logged hours
+        const todayIso = new Date().toISOString().split("T")[0];
+        const todayRec = records.find(r => r.date === todayIso);
+        if (todayRec) {
+            const hrsEl = document.getElementById("attTabHours");
+            const timerEl = document.getElementById("attTabTimer");
+            if (hrsEl) hrsEl.textContent = `${todayRec.total_hours} hrs logged`;
+            if (timerEl) timerEl.textContent = safeFormatDuration(todayRec.total_hours);
         }
 
         if (!records.length) {
@@ -281,12 +299,9 @@ async function loadMonthlyAttendanceHistory(monthStr) {
         };
 
         tbody.innerHTML = records.map(r => {
-            let durationText = formatDuration(r.total_hours);
-            if (!r.punch_out && r.punch_in) {
-                const startMs = new Date(r.punch_in.endsWith("Z") ? r.punch_in : r.punch_in + "Z").getTime();
-                const liveHrs = Math.max(0, (Date.now() - startMs) / 3600000);
-                durationText = `${formatDuration(liveHrs)} (Live)`;
-            }
+            const durationText = !r.punch_out && r.punch_in
+                ? `${safeFormatDuration(r.total_hours)} (Live)`
+                : safeFormatDuration(r.total_hours);
 
             return `
                 <tr class="hover:bg-[#F9FBFA]">
@@ -304,7 +319,7 @@ async function loadMonthlyAttendanceHistory(monthStr) {
             `;
         }).join("");
     } catch (err) {
-        tbody.innerHTML = `<tr><td colspan="6" class="py-5 text-center text-red-500">Could not load monthly attendance log.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="6" class="py-5 text-center text-red-500">Could not load monthly attendance log: ${err.message || ""}</td></tr>`;
     }
 }
 

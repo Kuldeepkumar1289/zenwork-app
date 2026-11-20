@@ -1,6 +1,6 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Boolean, Column, Float, Integer, String, Enum as SqlEnum, ForeignKey
+from sqlalchemy import Boolean, Column, Float, Integer, String, Enum as SqlEnum, ForeignKey, Text
 from sqlalchemy.orm import relationship, backref
 from src.utils.db import Base
 
@@ -23,7 +23,7 @@ class User(Base):
 
     role_tier = Column(SqlEnum(RoleTier), default=RoleTier.MEMBER, nullable=False)
     designation = Column(String(100), nullable=False, default="Team Member")
-    avatar_url = Column(String(500), nullable=True)
+    avatar_url = Column(Text, nullable=True)
     must_change_password = Column(Boolean, default=False, nullable=False)
 
     manager_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)

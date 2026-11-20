@@ -34,7 +34,8 @@ try:
     with engine.begin() as conn:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(120) NOT NULL DEFAULT 'Zenwork Studio'"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_code VARCHAR(40) NULL"))
-        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) NULL"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NULL"))
+        conn.execute(text("ALTER TABLE users MODIFY COLUMN avatar_url TEXT NULL"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE"))
 except Exception:
     pass

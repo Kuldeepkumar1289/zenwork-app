@@ -40,7 +40,7 @@ async function renderProfileSection() {
                     <div class="flex items-center gap-3.5 sm:gap-4 min-w-0">
                         <div id="profileAvatarPreview" class="w-16 h-16 rounded-2xl bg-[#1E6B52] text-white flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden border border-[#E6ECE8]">
                             ${avatarSrc
-                                ? `<img src="${avatarSrc}" alt="${currentUser.full_name}" class="w-full h-full object-cover">`
+                                ? `<img src="${avatarSrc}" alt="" onerror="this.parentElement.textContent='${initials}'" class="w-full h-full object-cover">`
                                 : initials}
                         </div>
                         <div class="min-w-0">
@@ -330,10 +330,9 @@ function launchCropperOverlay(img) {
     document.getElementById("confirmCropBtn").onclick = async () => {
         const saveBtn = document.getElementById("confirmCropBtn");
         saveBtn.disabled = true;
-        saveBtn.textContent = "Uploading...";
+        saveBtn.textContent = "Saving...";
 
-        // Render clean 400x400 output without guide ring
-        const outSize = 400;
+        const outSize = 320;
         const ratio = outSize / boxSize;
         const currentScale = baseScale * zoom * ratio;
         const outCanvas = document.createElement("canvas");
@@ -348,16 +347,24 @@ function launchCropperOverlay(img) {
             img.height * currentScale
         );
 
-        outCanvas.toBlob(async (blob) => {
-            if (!blob) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = "Crop & Save Photo";
-                return;
-            }
-            await uploadCroppedProfileBlob(blob, closeModal, saveBtn);
-        }, "image/jpeg", 0.92);
+        const croppedDataUrl = outCanvas.toDataURL("image/jpeg", 0.82);
+
+        try {
+            const updatedUser = await apiRequest("/users/me/profile", "PATCH", {
+                avatar_url: croppedDataUrl
+            });
+            currentUser = updatedUser;
+            localStorage.setItem("zenwork_user", JSON.stringify(currentUser));
+            if (typeof updateProfileUI === "function") updateProfileUI(currentUser);
+            if (typeof showToast === "function") showToast("Profile photo saved!", "success");
+            closeModal();
+            renderProfileSection();
+        } catch (err) {
+            if (typeof showToast === "function") showToast(err.message || "Could not save profile photo.", "error");
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Crop & Save Photo";
+        }
     };
-}
 
 async function uploadCroppedProfileBlob(blob, onSuccessClose, saveBtn) {
     try {

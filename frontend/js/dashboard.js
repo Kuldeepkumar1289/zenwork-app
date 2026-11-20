@@ -216,12 +216,133 @@ function filterDashboardTasks(status, clickedBtn) {
         renderTasksTable(allTasks.filter(t => t.status === status));
     }
 }
+const WORKSPACE_SECTIONS_INDEX = [
+    { key: "dashboard", label: "Dashboard", desc: "Overview, sky arc, KPIs & tasks", adminOnly: false },
+    { key: "performance", label: "Performance", desc: "Team scorecard & workload metrics", adminOnly: false },
+    { key: "attendance", label: "Attendance & Leaves", desc: "Punch logs, WFH & leave approvals", adminOnly: false },
+    { key: "calendar", label: "Calendar", desc: "Schedule, deadlines & meetings", adminOnly: false },
+    { key: "events", label: "Events", desc: "Company socials & team syncs", adminOnly: false },
+    { key: "chats", label: "Chats", desc: "Direct messages, lounge & files", adminOnly: false },
+    { key: "queries", label: "Queries", desc: "Inter-department questions & helpdesk", adminOnly: false },
+    { key: "tasks", label: "Tasks", desc: "All tasks, priorities & blockers", adminOnly: false },
+    { key: "organization", label: "Organization", desc: "Reporting hierarchy & live team status", adminOnly: false },
+    { key: "profile", label: "My Profile", desc: "Avatar cropper, name & designation", adminOnly: false },
+    { key: "settings", label: "Settings & Support", desc: "Alerts, privacy, security & help", adminOnly: false },
+    { key: "admin", label: "Admin Control", desc: "Onboard employees & role permissions", adminOnly: true }
+];
+
+function closeSearchResultsPopup() {
+    document.getElementById("zenGlobalSearchPopup")?.remove();
+}
 
 function handleSearchFilter(query) {
-    const q = query.toLowerCase();
-    const filtered = allTasks.filter(t => t.title.toLowerCase().includes(q));
-    renderTasksTable(filtered);
+    const trimmed = String(query || "").trim();
+    const q = trimmed.toLowerCase();
+
+    // Keep dashboard task table filtered when on dashboard
+    if (typeof renderTasksTable === "function" && Array.isArray(allTasks)) {
+        renderTasksTable(q ? allTasks.filter(t => String(t.title || "").toLowerCase().includes(q)) : allTasks);
+    }
+
+    const searchInput = document.getElementById("globalSearch");
+    if (!searchInput) return;
+
+    if (!q) {
+        closeSearchResultsPopup();
+        return;
+    }
+
+    const isAdmin = currentUser?.role_tier === "ADMIN";
+    const matchedSections = WORKSPACE_SECTIONS_INDEX.filter(s => {
+        if (s.adminOnly && !isAdmin) return false;
+        return s.label.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q) || s.key.includes(q);
+    }).slice(0, 4);
+
+    const matchedTasks = (Array.isArray(allTasks) ? allTasks : []).filter(t =>
+        String(t.title || "").toLowerCase().includes(q) ||
+        String(t.status || "").toLowerCase().includes(q) ||
+        String(t.priority || "").toLowerCase().includes(q)
+    ).slice(0, 5);
+
+    const rect = searchInput.getBoundingClientRect();
+    let popup = document.getElementById("zenGlobalSearchPopup");
+    if (!popup) {
+        popup = document.createElement("div");
+        popup.id = "zenGlobalSearchPopup";
+        document.body.appendChild(popup);
+    }
+
+    popup.style.cssText = `
+        position: fixed;
+        top: ${rect.bottom + 8}px;
+        left: ${Math.max(12, rect.left)}px;
+        width: ${Math.min(420, window.innerWidth - 24)}px;
+        background: #FFFFFF;
+        color: #0F172A;
+        border: 1px solid #CBD5E1;
+        border-radius: 16px;
+        box-shadow: 0 20px 44px rgba(15, 23, 42, 0.18);
+        padding: 10px;
+        z-index: 12000;
+        font-size: 12px;
+    `;
+
+    const secHtml = matchedSections.map(s => `
+        <button type="button" onclick="closeSearchResultsPopup(); switchSection('${s.key}');"
+            style="width:100%;text-align:left;padding:8px 10px;border-radius:10px;border:0;background:transparent;display:flex;justify-content:space-between;align-items:center;cursor:pointer;"
+            onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
+            <div>
+                <div style="font-weight:700;color:#0F172A;">${s.label}</div>
+                <div style="font-size:11px;color:#64748B;">${s.desc}</div>
+            </div>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#E2E8F0;color:#334155;">Section</span>
+        </button>
+    `).join("");
+
+    const taskHtml = matchedTasks.map(t => `
+        <button type="button" onclick="closeSearchResultsPopup(); switchSection('tasks');"
+            style="width:100%;text-align:left;padding:8px 10px;border-radius:10px;border:0;background:transparent;display:flex;justify-content:space-between;align-items:center;gap:8px;cursor:pointer;"
+            onmouseover="this.style.background='#F1F5F9'" onmouseout="this.style.background='transparent'">
+            <div style="min-width:0;">
+                <div style="font-weight:600;color:#0F172A;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.title}</div>
+                <div style="font-size:11px;color:#64748B;">${t.priority || "MEDIUM"} &bull; ${(t.status || "TODO").replace("_", " ")}</div>
+            </div>
+            <span style="font-size:10px;font-weight:700;padding:2px 8px;border-radius:999px;background:#DCFCE7;color:#166534;flex-shrink:0;">Task</span>
+        </button>
+    `).join("");
+
+    popup.innerHTML = `
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:2px 6px 8px;border-bottom:1px solid #E2E8F0;margin-bottom:6px;">
+            <span style="font-size:11px;font-weight:700;color:#475569;">Search results for "${trimmed}"</span>
+            <button type="button" onclick="closeSearchResultsPopup()" style="border:0;background:none;color:#64748B;font-weight:700;cursor:pointer;">✕</button>
+        </div>
+        ${secHtml}${taskHtml}
+        ${(!secHtml && !taskHtml) ? `<div style="padding:14px;text-align:center;color:#64748B;">No matching tasks or sections found.</div>` : ""}
+    `;
 }
+
+document.addEventListener("click", (e) => {
+    const popup = document.getElementById("zenGlobalSearchPopup");
+    const searchInput = document.getElementById("globalSearch");
+    if (popup && !popup.contains(e.target) && e.target !== searchInput) {
+        closeSearchResultsPopup();
+    }
+});
+
+document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") {
+        closeSearchResultsPopup();
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        const searchInput = document.getElementById("globalSearch") || document.querySelector("input[placeholder*='Search']");
+        if (searchInput) {
+            searchInput.focus();
+            searchInput.select();
+            if (searchInput.value.trim()) handleSearchFilter(searchInput.value);
+        }
+    }
+});
 
 async function markTaskDone(taskId) {
     try {

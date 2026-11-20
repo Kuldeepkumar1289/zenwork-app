@@ -53,7 +53,7 @@ async function renderProfileSection() {
                     </div>
 
                     <div class="flex items-center gap-2">
-                        <input type="file" id="profileDpInput" accept="image/*" class="hidden" onchange="handleProfileDpUpload(event)">
+                        <input type="file" id="profileDpInput" accept="image/*" class="hidden" onchange="openDpCropperModal(event)">
                         <button type="button" id="uploadDpBtn" onclick="document.getElementById('profileDpInput').click()"
                             class="px-3.5 py-2 rounded-xl bg-[#EBF3EF] hover:bg-[#DCEBE3] text-[#1E6B52] text-xs font-semibold transition cursor-pointer">
                             Change Photo
@@ -175,21 +175,194 @@ async function renderProfileSection() {
     });
 }
 
-async function handleProfileDpUpload(event) {
+/* Interactive Drag + Zoom DP Cropper Modal */
+function openDpCropperModal(event) {
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
 
-    if (file.size > 5 * 1024 * 1024) {
-        if (typeof showToast === "function") showToast("Please choose an image smaller than 5 MB.", "error");
+    if (file.size > 8 * 1024 * 1024) {
+        if (typeof showToast === "function") showToast("Please choose an image smaller than 8 MB.", "error");
         return;
     }
 
-    const btn = document.getElementById("uploadDpBtn");
-    if (btn) { btn.disabled = true; btn.textContent = "Uploading..."; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => launchCropperOverlay(img);
+        img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+}
 
+function launchCropperOverlay(img) {
+    const existing = document.getElementById("dpCropperModal");
+    if (existing) existing.remove();
+
+    const boxSize = 260;
+    const baseScale = Math.max(boxSize / img.width, boxSize / img.height);
+    let zoom = 1;
+    let offsetX = (boxSize - img.width * baseScale) / 2;
+    let offsetY = (boxSize - img.height * baseScale) / 2;
+    let dragging = false;
+    let startX = 0;
+    let startY = 0;
+
+    const modal = document.createElement("div");
+    modal.id = "dpCropperModal";
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(15, 23, 42, 0.65);
+        backdrop-filter: blur(6px); display: flex; align-items: center;
+        justify-content: center; padding: 16px; z-index: 25000;
+    `;
+    modal.innerHTML = `
+        <div style="background:#fff;border-radius:24px;max-width:380px;width:100%;padding:24px;box-shadow:0 24px 60px rgba(0,0,0,0.25);">
+            <div class="flex items-center justify-between mb-2">
+                <h3 class="text-base font-bold text-gray-900">Crop Profile Photo</h3>
+                <button type="button" id="closeCropperBtn" class="text-gray-400 hover:text-gray-700 text-lg font-bold cursor-pointer">&times;</button>
+            </div>
+            <p class="text-[11px] text-gray-500 mb-4">Drag the image to reposition and use the slider to zoom.</p>
+
+            <div class="flex justify-center">
+                <canvas id="dpCropCanvas" width="${boxSize}" height="${boxSize}"
+                    style="border-radius:20px;border:2px solid #1E6B52;cursor:grab;touch-action:none;background:#0f172a;">
+                </canvas>
+            </div>
+
+            <div class="mt-4 flex items-center gap-3 text-xs">
+                <span class="text-gray-500 font-medium">Zoom</span>
+                <input type="range" id="dpZoomSlider" min="1" max="3" step="0.02" value="1" class="w-full accent-[#1E6B52] cursor-pointer">
+                <span id="dpZoomValue" class="text-gray-700 font-semibold w-10 text-right">1.0x</span>
+            </div>
+
+            <div class="mt-5 flex gap-2">
+                <button type="button" id="cancelCropBtn" class="w-1/3 py-2.5 rounded-xl border border-gray-200 text-gray-600 text-xs font-semibold hover:bg-gray-50 cursor-pointer">
+                    Cancel
+                </button>
+                <button type="button" id="confirmCropBtn" class="w-2/3 py-2.5 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold cursor-pointer">
+                    Crop &amp; Save Photo
+                </button>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(modal);
+
+    const canvas = document.getElementById("dpCropCanvas");
+    const ctx = canvas.getContext("2d");
+    const slider = document.getElementById("dpZoomSlider");
+    const zoomLabel = document.getElementById("dpZoomValue");
+
+    function clampOffsets() {
+        const currentScale = baseScale * zoom;
+        const drawW = img.width * currentScale;
+        const drawH = img.height * currentScale;
+        const minX = boxSize - drawW;
+        const minY = boxSize - drawH;
+        offsetX = Math.min(0, Math.max(minX, offsetX));
+        offsetY = Math.min(0, Math.max(minY, offsetY));
+    }
+
+    function drawPreview() {
+        clampOffsets();
+        const currentScale = baseScale * zoom;
+        ctx.clearRect(0, 0, boxSize, boxSize);
+        ctx.drawImage(img, offsetX, offsetY, img.width * currentScale, img.height * currentScale);
+
+        // Subtle circular guide overlay
+        ctx.save();
+        ctx.strokeStyle = "rgba(255, 255, 255, 0.75)";
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.arc(boxSize / 2, boxSize / 2, boxSize / 2 - 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+
+    drawPreview();
+
+    slider.addEventListener("input", () => {
+        const prevScale = baseScale * zoom;
+        zoom = parseFloat(slider.value);
+        const nextScale = baseScale * zoom;
+        zoomLabel.textContent = `${zoom.toFixed(1)}x`;
+
+        // Zoom toward the center of the crop box
+        const centerX = boxSize / 2;
+        const centerY = boxSize / 2;
+        offsetX = centerX - ((centerX - offsetX) / prevScale) * nextScale;
+        offsetY = centerY - ((centerY - offsetY) / prevScale) * nextScale;
+        drawPreview();
+    });
+
+    const startDrag = (clientX, clientY) => {
+        dragging = true;
+        startX = clientX - offsetX;
+        startY = clientY - offsetY;
+        canvas.style.cursor = "grabbing";
+    };
+    const moveDrag = (clientX, clientY) => {
+        if (!dragging) return;
+        offsetX = clientX - startX;
+        offsetY = clientY - startY;
+        drawPreview();
+    };
+    const endDrag = () => {
+        dragging = false;
+        canvas.style.cursor = "grab";
+    };
+
+    canvas.addEventListener("mousedown", (e) => startDrag(e.clientX, e.clientY));
+    window.addEventListener("mousemove", (e) => moveDrag(e.clientX, e.clientY));
+    window.addEventListener("mouseup", endDrag);
+
+    canvas.addEventListener("touchstart", (e) => {
+        if (e.touches.length === 1) startDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    canvas.addEventListener("touchmove", (e) => {
+        if (e.touches.length === 1) moveDrag(e.touches[0].clientX, e.touches[0].clientY);
+    }, { passive: true });
+    canvas.addEventListener("touchend", endDrag);
+
+    const closeModal = () => modal.remove();
+    document.getElementById("closeCropperBtn").onclick = closeModal;
+    document.getElementById("cancelCropBtn").onclick = closeModal;
+
+    document.getElementById("confirmCropBtn").onclick = async () => {
+        const saveBtn = document.getElementById("confirmCropBtn");
+        saveBtn.disabled = true;
+        saveBtn.textContent = "Uploading...";
+
+        // Render clean 400x400 output without guide ring
+        const outSize = 400;
+        const ratio = outSize / boxSize;
+        const currentScale = baseScale * zoom * ratio;
+        const outCanvas = document.createElement("canvas");
+        outCanvas.width = outSize;
+        outCanvas.height = outSize;
+        const outCtx = outCanvas.getContext("2d");
+        outCtx.drawImage(
+            img,
+            offsetX * ratio,
+            offsetY * ratio,
+            img.width * currentScale,
+            img.height * currentScale
+        );
+
+        outCanvas.toBlob(async (blob) => {
+            if (!blob) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = "Crop & Save Photo";
+                return;
+            }
+            await uploadCroppedProfileBlob(blob, closeModal, saveBtn);
+        }, "image/jpeg", 0.92);
+    };
+}
+
+async function uploadCroppedProfileBlob(blob, onSuccessClose, saveBtn) {
     try {
         const formData = new FormData();
-        formData.append("file", file, file.name);
+        formData.append("file", blob, "profile_dp.jpg");
         const headers = { Authorization: `Bearer ${getAuthToken()}` };
 
         let uploadRes = await fetch(`${API_BASE_URL}/media/upload`, { method: "POST", headers, body: formData });
@@ -205,12 +378,15 @@ async function handleProfileDpUpload(event) {
         currentUser = updatedUser;
         localStorage.setItem("zenwork_user", JSON.stringify(currentUser));
         if (typeof updateProfileUI === "function") updateProfileUI(currentUser);
-        if (typeof showToast === "function") showToast("Profile photo updated!", "success");
+        if (typeof showToast === "function") showToast("Cropped profile photo saved!", "success");
+        onSuccessClose();
         renderProfileSection();
     } catch (err) {
         if (typeof showToast === "function") showToast(err.message || "Could not upload profile photo.", "error");
-    } finally {
-        if (btn) { btn.disabled = false; btn.textContent = "Change Photo"; }
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = "Crop & Save Photo";
+        }
     }
 }
 

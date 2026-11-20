@@ -1,13 +1,15 @@
 from datetime import datetime
 from enum import Enum
-from sqlalchemy import Column, Float, Integer, String, Enum as SqlEnum, ForeignKey
+from sqlalchemy import Boolean, Column, Float, Integer, String, Enum as SqlEnum, ForeignKey
 from sqlalchemy.orm import relationship, backref
 from src.utils.db import Base
+
 
 class RoleTier(str, Enum):
     ADMIN = "ADMIN"
     MANAGER = "MANAGER"
     MEMBER = "MEMBER"
+
 
 class User(Base):
     __tablename__ = "users"
@@ -15,13 +17,14 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     company_name = Column(String(120), nullable=False, index=True, default="Zenwork Studio")
     company_code = Column(String(40), nullable=True, index=True)
-    admin_join_key = Column(String(255), nullable=True)  # Hashed company passcode set by Admin
     full_name = Column(String(100), nullable=False)
     email = Column(String(100), unique=True, index=True, nullable=False)
     hashed_password = Column(String(255), nullable=False)
 
     role_tier = Column(SqlEnum(RoleTier), default=RoleTier.MEMBER, nullable=False)
     designation = Column(String(100), nullable=False, default="Team Member")
+    avatar_url = Column(String(500), nullable=True)
+    must_change_password = Column(Boolean, default=False, nullable=False)
 
     manager_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     subordinates = relationship("User", backref=backref("manager", remote_side=[id]))

@@ -3,17 +3,28 @@ from pydantic import BaseModel, EmailStr, Field, ConfigDict
 from src.user.models import RoleTier
 
 
-class UserRegister(BaseModel):
-    company_name: str = "Zenwork Studio"
-    company_code: Optional[str] = None          # e.g., ZEN-101 (Company ID)
-    admin_passcode: Optional[str] = None        # Set by Admin on creation; verified when employee joins
-    is_new_company: bool = False
+class OrgRegisterRequest(BaseModel):
+    company_name: str
+    company_code: Optional[str] = None
     full_name: str
     email: EmailStr
+    designation: str = "Organization Admin"
     password: str = Field(..., min_length=6)
-    role_tier: RoleTier = RoleTier.MEMBER
+
+
+class AdminInviteEmployeeRequest(BaseModel):
+    full_name: str
+    email: EmailStr
     designation: str = "Team Member"
+    role_tier: RoleTier = RoleTier.MEMBER
     manager_id: Optional[int] = None
+    temp_password: Optional[str] = None
+
+
+class ProfileUpdateRequest(BaseModel):
+    full_name: Optional[str] = None
+    designation: Optional[str] = None
+    avatar_url: Optional[str] = None
 
 
 class UserLogin(BaseModel):
@@ -29,7 +40,9 @@ class UserResponse(BaseModel):
     email: EmailStr
     role_tier: RoleTier
     designation: str
+    avatar_url: Optional[str] = None
     manager_id: Optional[int] = None
+    must_change_password: bool = False
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -48,6 +61,7 @@ class OrgNodeResponse(BaseModel):
     email: EmailStr
     role_tier: RoleTier
     designation: str
+    avatar_url: Optional[str] = None
     subordinates: List["OrgNodeResponse"] = []
 
     model_config = ConfigDict(from_attributes=True)

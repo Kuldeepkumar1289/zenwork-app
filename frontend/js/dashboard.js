@@ -101,7 +101,15 @@ function updateProfileUI(user) {
 
     document.getElementById("topUserName").textContent = user.full_name;
     document.getElementById("topUserRole").textContent = user.designation;
-    document.getElementById("topAvatar").textContent = firstName[0].toUpperCase();
+
+    const topAvatar = document.getElementById("topAvatar");
+    if (topAvatar) {
+        if (user.avatar_url && typeof resolveAvatarSrc === "function") {
+            topAvatar.innerHTML = `<img src="${resolveAvatarSrc(user.avatar_url)}" alt="${user.full_name}" style="width:100%;height:100%;object-fit:cover;border-radius:inherit;">`;
+        } else {
+            topAvatar.textContent = firstName[0].toUpperCase();
+        }
+    }
 
     if (user.role_tier === "ADMIN") {
         document.getElementById("adminNavSection").classList.remove("hidden");

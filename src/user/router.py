@@ -10,16 +10,19 @@ from src.user.controller import (
     build_org_tree,
     change_user_password,
     complete_password_reset_with_otp,
+    create_employee_by_admin,
     initiate_password_reset_otp,
-    register_user
+    register_organization
 )
 from src.user.dtos import (
+    AdminInviteEmployeeRequest,
     ChangePasswordRequest,
     OrgNodeResponse,
+    OrgRegisterRequest,
+    ProfileUpdateRequest,
     SendOtpRequest,
     TokenResponse,
     UserLogin,
-    UserRegister,
     UserResponse,
     VerifyOtpResetRequest
 )
@@ -29,58 +32,64 @@ from src.utils.dependencies import get_current_user
 
 try:
     with engine.begin() as conn:
-        conn.execute(text(
-            "ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(120) NOT NULL DEFAULT 'Zenwork Studio'"
-        ))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_name VARCHAR(120) NOT NULL DEFAULT 'Zenwork Studio'"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS company_code VARCHAR(40) NULL"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url VARCHAR(500) NULL"))
+        conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE"))
 except Exception:
     pass
 
 user_router = APIRouter(prefix="/users", tags=["Authentication & Hierarchy"])
 
 
-@user_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Register a new Organization workspace (Admin)")
-def register(data: UserRegister, db: Session = Depends(get_db)):
-    """Only an Organization can register a new workspace. Employees are created by their Organization Admin."""
-    if not data.is_new_company:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Employees cannot self-register. Ask your Organization Admin to create your employee account."
-        )
-    data.role_tier = RoleTier.ADMIN
-    return register_user(data=data, db=db)
+@user_router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
+def register_org(data: OrgRegisterRequest, db: Session = Depends(get_db)):
+    return register_organization(data=data, db=db)
 
 
-@user_router.post("/admin/create-employee", response_model=UserResponse, status_code=status.HTTP_201_CREATED, summary="Organization Admin creates a new employee account")
-def admin_create_employee(
-    data: UserRegister,
+@user_router.post("/admin/add-employee", status_code=status.HTTP_201_CREATED)
+def add_employee(
+    data: AdminInviteEmployeeRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Creates a new employee strictly locked inside the Admin's own organization."""
     if current_user.role_tier != RoleTier.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only an Organization Admin can create new employee accounts."
+            detail="Only Organization Admins can create employee accounts."
         )
-    data.is_new_company = False
-    data.company_name = current_user.company_name
-    if data.role_tier == RoleTier.ADMIN:
-        data.role_tier = RoleTier.MEMBER
-    return register_user(data=data, db=db)
+    return create_employee_by_admin(data=data, admin_user=current_user, db=db)
 
 
-@user_router.post("/login", response_model=TokenResponse, summary="Authenticate a user and generate an access token")
+@user_router.post("/login", response_model=TokenResponse)
 def login(form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     login_data = UserLogin(email=form_data.username, password=form_data.password)
     return authenticate_user(data=login_data, db=db)
 
 
-@user_router.get("/me", response_model=UserResponse, summary="Get the current authenticated user's details")
+@user_router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-@user_router.get("/org-tree", response_model=List[OrgNodeResponse], summary="Get organizational hierarchy for current user's company")
+@user_router.patch("/me/profile", response_model=UserResponse)
+def update_my_profile(
+    data: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    if data.full_name is not None and data.full_name.strip():
+        current_user.full_name = data.full_name.strip()
+    if data.designation is not None and data.designation.strip():
+        current_user.designation = data.designation.strip()
+    if "avatar_url" in data.model_fields_set:
+        current_user.avatar_url = data.avatar_url
+    db.commit()
+    db.refresh(current_user)
+    return current_user
+
+
+@user_router.get("/org-tree", response_model=List[OrgNodeResponse])
 def get_org_tree(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -92,7 +101,7 @@ def get_org_tree(
     return [build_org_tree(leader) for leader in top_leaders]
 
 
-@user_router.post("/change-password", summary="Verify current password and set a new password")
+@user_router.post("/change-password")
 def change_password(
     data: ChangePasswordRequest,
     current_user: User = Depends(get_current_user),
@@ -101,17 +110,11 @@ def change_password(
     return change_user_password(data=data, current_user=current_user, db=db)
 
 
-@user_router.post("/forgot-password/send-otp", summary="Send 6-digit OTP to registered work email")
-def send_password_reset_otp(
-    data: SendOtpRequest,
-    db: Session = Depends(get_db)
-):
+@user_router.post("/forgot-password/send-otp")
+def send_password_reset_otp(data: SendOtpRequest, db: Session = Depends(get_db)):
     return initiate_password_reset_otp(data=data, db=db)
 
 
-@user_router.post("/forgot-password/verify-reset", summary="Verify email OTP and set a new password")
-def verify_otp_and_reset_password(
-    data: VerifyOtpResetRequest,
-    db: Session = Depends(get_db)
-):
+@user_router.post("/forgot-password/verify-reset")
+def verify_otp_and_reset_password(data: VerifyOtpResetRequest, db: Session = Depends(get_db)):
     return complete_password_reset_with_otp(data=data, db=db)

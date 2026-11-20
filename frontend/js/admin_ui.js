@@ -23,12 +23,12 @@ async function renderAdminSection() {
             <div>
                 <span class="text-[10px] font-semibold uppercase tracking-wider text-amber-600">MASTER CONTROL</span>
                 <h1 class="text-2xl font-semibold text-gray-900">Super Admin Panel</h1>
-                <p class="text-xs text-gray-500 mt-0.5">Manage workspace roles, promote up to 2 co-admins, and override records.</p>
+                <p class="text-xs text-gray-500 mt-0.5">Onboard employees into <b>${currentUser.company_name}</b>, manage roles, and oversee workspace metrics.</p>
             </div>
         </div>
 
-        <!-- 5 Global Master KPI Cards (Responsive: 2 cols mobile, 3 tablet, 5 desktop) -->
-        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+        <!-- 5 Global Master KPI Cards -->
+        <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-4">
             <div class="bg-white p-4 rounded-2xl border border-[#E6ECE8]">
                 <p class="text-[11px] text-gray-500">Total Members</p>
                 <p id="admTotalUsers" class="text-2xl font-bold text-gray-900 mt-1">0</p>
@@ -51,8 +51,54 @@ async function renderAdminSection() {
             </div>
         </div>
 
+        <!-- Onboard New Employee Card -->
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 mt-4">
+            <div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-gray-900">Onboard New Employee</h2>
+                    <p class="text-[11px] text-gray-400">
+                        Creates an employee locked to <b>${currentUser.company_name}</b> (${currentUser.company_code || "ORG"}) with an auto-generated temporary password.
+                    </p>
+                </div>
+                <span class="chip">Organization Locked</span>
+            </div>
+
+            <form id="adminAddEmployeeForm" onsubmit="handleAdminAddEmployee(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Employee Full Name</label>
+                    <input type="text" id="admNewEmpName" required placeholder="Priya Verma" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Work Email</label>
+                    <input type="email" id="admNewEmpEmail" required placeholder="priya@company.com" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Designation</label>
+                    <input type="text" id="admNewEmpDesig" required placeholder="Backend Developer" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Role Tier</label>
+                    <select id="admNewEmpRole" class="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white">
+                        <option value="MEMBER">MEMBER</option>
+                        <option value="MANAGER">MANAGER</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block font-medium text-gray-700 mb-1">Reporting Manager ID (Optional)</label>
+                    <input type="number" id="admNewEmpMgr" placeholder="e.g. 1" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                </div>
+                <div class="flex items-end">
+                    <button type="submit" id="admAddEmpBtn" class="w-full py-2 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white font-semibold cursor-pointer">
+                        + Create Employee Account
+                    </button>
+                </div>
+            </form>
+
+            <div id="admCreatedCredsBox" class="hidden mt-4 p-3.5 rounded-xl bg-[#ECFDF5] border border-[#A7F3D0] text-xs text-[#065F46]"></div>
+        </div>
+
         <!-- User Role & Co-Admin Delegation Table -->
-        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5">
+        <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 mt-4">
             <div class="flex items-center justify-between flex-wrap gap-2 mb-4">
                 <div>
                     <h2 class="text-sm font-semibold text-gray-900">Workspace Members & Role Permissions</h2>
@@ -84,27 +130,42 @@ async function renderAdminSection() {
     await loadAdminDashboardData();
 }
 
-async function handleAdminCreateEmployee(e) {
-  e.preventDefault();
-  const payload = {
-    company_name: currentUser.company_name,
-    is_new_company: false,
-    full_name: document.getElementById("admEmpName").value.trim(),
-    email: document.getElementById("admEmpEmail").value.trim(),
-    designation: document.getElementById("admEmpDesignation").value.trim() || "Team Member",
-    role_tier: document.getElementById("admEmpRole").value,
-    manager_id: document.getElementById("admEmpManager").value ? parseInt(document.getElementById("admEmpManager").value) : null,
-    password: document.getElementById("admEmpPassword").value
-  };
+async function handleAdminAddEmployee(e) {
+    e.preventDefault();
+    const btn = document.getElementById("admAddEmpBtn");
+    const credsBox = document.getElementById("admCreatedCredsBox");
+    btn.disabled = true;
+    btn.textContent = "Creating...";
 
-  try {
-    await apiRequest("/users/admin/create-employee", "POST", payload);
-    if (typeof showToast === "function") showToast(`Employee ${payload.full_name} added to ${currentUser.company_name}!`, "success");
-    e.target.reset();
-    if (typeof renderAdminSection === "function") renderAdminSection();
-  } catch (err) {
-    if (typeof showToast === "function") showToast(err.message || "Failed to create employee.", "error");
-  }
+    try {
+        const mgrVal = document.getElementById("admNewEmpMgr").value.trim();
+        const res = await apiRequest("/users/admin/add-employee", "POST", {
+            full_name: document.getElementById("admNewEmpName").value.trim(),
+            email: document.getElementById("admNewEmpEmail").value.trim(),
+            designation: document.getElementById("admNewEmpDesig").value.trim(),
+            role_tier: document.getElementById("admNewEmpRole").value,
+            manager_id: mgrVal ? parseInt(mgrVal, 10) : null
+        });
+
+        e.target.reset();
+        if (credsBox) {
+            credsBox.classList.remove("hidden");
+            credsBox.innerHTML = `
+                <b>✓ Employee Account Created!</b> Share these first-login credentials with <b>${res.employee.full_name}</b>:<br>
+                <div class="mt-1.5 font-mono text-[12px] bg-white px-3 py-2 rounded-lg border border-[#A7F3D0]">
+                    Email: <b>${res.employee.email}</b> &nbsp;|&nbsp; Temporary Password: <b>${res.temp_password}</b>
+                </div>
+                <span class="block mt-1 text-[11px] opacity-80">The employee will set their own personal password upon first sign-in.</span>
+            `;
+        }
+        if (typeof showToast === "function") showToast("Employee account created!", "success");
+        await loadAdminDashboardData();
+    } catch (err) {
+        if (typeof showToast === "function") showToast(err.message || "Could not create employee.", "error");
+    } finally {
+        btn.disabled = false;
+        btn.textContent = "+ Create Employee Account";
+    }
 }
 
 async function loadAdminDashboardData() {
@@ -175,10 +236,10 @@ async function saveUserAdminChanges(userId) {
 
     try {
         await apiRequest(`/admin/users/${userId}`, "PATCH", payload);
-        alert("User permissions updated!");
+        if (typeof showToast === "function") showToast("User permissions updated!", "success");
         await loadAdminDashboardData();
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
         await loadAdminDashboardData();
     }
 }
@@ -187,8 +248,9 @@ async function deleteUserByAdmin(userId, name) {
     if (!confirm(`Are you sure you want to remove ${name} from the workspace?`)) return;
     try {
         await apiRequest(`/admin/users/${userId}`, "DELETE");
+        if (typeof showToast === "function") showToast(`${name} removed from workspace.`, "info");
         await loadAdminDashboardData();
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
     }
 }

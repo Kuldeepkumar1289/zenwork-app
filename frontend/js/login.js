@@ -2,7 +2,6 @@ if (getAuthToken()) {
   window.location.href = "index.html";
 }
 
-// Sync login page background & accent colors automatically with current time of day
 document.addEventListener("DOMContentLoaded", () => {
   const now = new Date();
   const hour = now.getHours() + now.getMinutes() / 60;
@@ -16,7 +15,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-/* Helpers */
 function showAlert(msg, isError = true) {
   const box = document.getElementById("alertBox");
   box.textContent = msg;
@@ -33,28 +31,6 @@ function togglePassVisibility(inputId, btn) {
   btn.textContent = isHidden ? "Hide" : "Show";
 }
 
-function handleCompanyModeChange(mode) {
-  const roleWrap = document.getElementById("regRoleSelectWrap");
-  const desigInput = document.getElementById("regDesignation");
-  const passLabel = document.getElementById("adminPasscodeLabel");
-  const passInput = document.getElementById("regAdminPasscode");
-  const passHint = document.getElementById("adminPasscodeHint");
-
-  if (mode === "create") {
-    if (roleWrap) roleWrap.classList.add("hidden");
-    if (desigInput && !desigInput.value) desigInput.value = "Organization Admin";
-    if (passLabel) passLabel.textContent = "Set Organization Admin Passcode";
-    if (passInput) passInput.placeholder = "Create passcode for your employees (min 4 chars)";
-    if (passHint) passHint.textContent = "Share this Company ID & Admin Passcode with your employees so they can create their accounts.";
-  } else {
-    if (roleWrap) roleWrap.classList.remove("hidden");
-    if (desigInput && desigInput.value === "Organization Admin") desigInput.value = "";
-    if (passLabel) passLabel.textContent = "Organization Admin Passcode (Required)";
-    if (passInput) passInput.placeholder = "Enter Admin onboarding passcode";
-    if (passHint) passHint.textContent = "Provided by your company Admin to lock your account to this organization.";
-  }
-}
-
 function toggleAuthMode(mode) {
   document.getElementById("alertBox").classList.add("hidden");
   document.getElementById("forgotForm").classList.add("hidden");
@@ -64,57 +40,40 @@ function toggleAuthMode(mode) {
   document.getElementById("registerForm").classList.toggle("hidden", !isRegister);
 
   document.getElementById("formHeading").textContent =
-    isRegister ? "Create your workspace account" : "Welcome back";
+    isRegister ? "Register company workspace" : "Welcome back";
   document.getElementById("formSubheading").textContent =
-    isRegister ? "Register a new organization or join your company using your Company ID & Admin Passcode."
-               : "Sign in to access your tasks, attendance, and team workspace.";
+    isRegister ? "Create your organization workspace, then invite employees from Admin Control."
+               : "Sign in with your company email and password.";
   document.getElementById("toggleText").innerHTML = isRegister
     ? `Already have an account? <button type="button" onclick="toggleAuthMode('login')" class="link">Sign in</button>`
-    : `Don't have an account? <button type="button" onclick="toggleAuthMode('register')" class="link">Sign up</button>`;
+    : `Setting up a new company? <button type="button" onclick="toggleAuthMode('register')" class="link">Register company workspace</button>`;
 }
 
-document.getElementById("registerForm").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const btn = document.getElementById("regSubmitBtn");
-  btn.disabled = true;
-  btn.textContent = "Creating account...";
+function toggleForgotPanel(showForgot) {
+  document.getElementById("alertBox").classList.add("hidden");
+  document.getElementById("registerForm").classList.add("hidden");
+  document.getElementById("loginForm").classList.toggle("hidden", showForgot);
+  document.getElementById("forgotForm").classList.toggle("hidden", !showForgot);
 
-  try {
-    const modeEl = document.getElementById("regCompanyMode");
-    const isNewCompany = modeEl ? modeEl.value === "create" : false;
-    const companyName = document.getElementById("regCompanyName").value.trim();
-    const companyCode = document.getElementById("regCompanyCode").value.trim().toUpperCase();
-
-    await apiRequest("/users/register", "POST", {
-      company_name:   companyName,
-      company_code:   companyCode,
-      admin_passcode: document.getElementById("regAdminPasscode").value.trim(),
-      is_new_company: isNewCompany,
-      full_name:      document.getElementById("regName").value.trim(),
-      email:          document.getElementById("regEmail").value.trim(),
-      designation:    document.getElementById("regDesignation").value.trim() || "Team Member",
-      role_tier:      isNewCompany ? "ADMIN" : document.getElementById("regRole").value,
-      password:       document.getElementById("regPassword").value
-    });
-
-    showAlert(
-      isNewCompany
-        ? `Organization "${companyName}" (${companyCode}) created! Sign in now.`
-        : `Account created under "${companyName}" (${companyCode})! Sign in now.`,
-      false
-    );
-    document.getElementById("registerForm").reset();
-    handleCompanyModeChange("join");
-    setTimeout(() => toggleAuthMode("login"), 1500);
-  } catch (err) {
-    showAlert(err.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Create Account →";
+  const otpFields = document.getElementById("otpVerifyFields");
+  const submitBtn = document.getElementById("forgotSubmitBtn");
+  const emailInput = document.getElementById("forgotEmail");
+  const sendBtn = document.getElementById("sendOtpBtn");
+  if (otpFields) otpFields.classList.add("hidden");
+  if (emailInput) emailInput.readOnly = false;
+  if (sendBtn) sendBtn.textContent = "Send OTP";
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.classList.add("opacity-60", "cursor-not-allowed");
   }
-});
 
-/* Step 1: Request 6-Digit Email OTP */
+  document.getElementById("formHeading").textContent =
+    showForgot ? "Reset password" : "Welcome back";
+  document.getElementById("formSubheading").textContent =
+    showForgot ? "Verify your registered work email with a 6-digit OTP."
+               : "Sign in with your company email and password.";
+}
+
 async function requestResetOtp() {
   const email = document.getElementById("forgotEmail").value.trim();
   if (!email) {
@@ -147,7 +106,6 @@ async function requestResetOtp() {
   }
 }
 
-/* Sign In */
 document.getElementById("loginForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("loginSubmitBtn");
@@ -179,7 +137,6 @@ document.getElementById("loginForm").addEventListener("submit", async (e) => {
   }
 });
 
-/* Step 2: Verify OTP & Reset Password */
 document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("forgotSubmitBtn");
@@ -208,41 +165,35 @@ document.getElementById("forgotForm").addEventListener("submit", async (e) => {
   }
 });
 
-/* Multi-Company Sign Up */
 document.getElementById("registerForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const btn = document.getElementById("regSubmitBtn");
   btn.disabled = true;
-  btn.textContent = "Setting up workspace...";
+  btn.textContent = "Creating workspace...";
 
   try {
-    const modeEl = document.getElementById("regCompanyMode");
-    const isNewCompany = modeEl ? modeEl.value === "create" : false;
     const companyName = document.getElementById("regCompanyName").value.trim();
+    const companyCode = document.getElementById("regCompanyCode").value.trim().toUpperCase();
 
-    await apiRequest("/users/register", "POST", {
-      company_name:   companyName,
-      is_new_company: isNewCompany,
-      full_name:      document.getElementById("regName").value.trim(),
-      email:          document.getElementById("regEmail").value.trim(),
-      designation:    document.getElementById("regDesignation").value.trim() || "Team Member",
-      role_tier:      isNewCompany ? "ADMIN" : document.getElementById("regRole").value,
-      password:       document.getElementById("regPassword").value
+    const created = await apiRequest("/users/register", "POST", {
+      company_name: companyName,
+      company_code: companyCode || null,
+      full_name:    document.getElementById("regName").value.trim(),
+      email:        document.getElementById("regEmail").value.trim(),
+      designation:  "Organization Admin",
+      password:     document.getElementById("regPassword").value
     });
 
     showAlert(
-      isNewCompany
-        ? `Workspace "${companyName}" created! Sign in as Admin to manage your team.`
-        : `Account created under "${companyName}"! Please sign in now.`,
+      `Company "${created.company_name}" (${created.company_code}) created! Sign in to onboard your employees.`,
       false
     );
     document.getElementById("registerForm").reset();
-    handleCompanyModeChange("join");
-    setTimeout(() => toggleAuthMode("login"), 1400);
+    setTimeout(() => toggleAuthMode("login"), 1600);
   } catch (err) {
     showAlert(err.message, true);
   } finally {
     btn.disabled = false;
-    btn.textContent = "Create workspace account";
+    btn.textContent = "Create Company Workspace →";
   }
 });

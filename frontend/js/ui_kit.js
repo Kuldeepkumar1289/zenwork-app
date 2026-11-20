@@ -2,7 +2,7 @@
 
 // 1. Central API endpoint map (change a URL once here if backend routes evolve)
 const API = {
-  analytics: "/analytics/PerformanceScorecard",
+  analytics: "/analytics/scorecard",
   orgTree:   "/users/org-tree",
   queries:   "/queries/",
   notices:   "/communications/",

@@ -1,6 +1,4 @@
-/* daylight-init.js — Automatic Clock-Synced Sun & Theme Engine
-   No manual overrides; updates automatically with system time
-    */
+/* daylight-init.js — Automatic Weather & Clock-Synced Sun/Moon Engine */
 document.addEventListener("DOMContentLoaded", () => {
   function getNowHour() {
     const now = new Date();
@@ -16,36 +14,78 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${hh12}:${mm} ${ampm}`;
   }
 
+  function decodeWeatherCode(code) {
+    if (code === 0) return { label: "Clear Sky", isRainy: false, isCloudy: false };
+    if (code >= 1 && code <= 3) return { label: "Partly Cloudy", isRainy: false, isCloudy: true };
+    if (code >= 45 && code <= 48) return { label: "Misty", isRainy: false, isCloudy: true };
+    if ((code >= 51 && code <= 67) || (code >= 80 && code <= 99)) {
+      return { label: "Rainy", isRainy: true, isCloudy: true };
+    }
+    return { label: "Bright Day", isRainy: false, isCloudy: false };
+  }
+
   function syncDaylight() {
     const nowHour = getNowHour();
-
     const palette = window.DaylightTheme
       ? window.DaylightTheme.apply(nowHour)
-      : { name: "Daylight" };
+      : { name: "Daylight", cycleLine: "24h Solar & Lunar Sync" };
 
     if (window.DaylightSky) {
       window.DaylightSky.render(nowHour);
     }
 
+    const cycleEl = document.getElementById("cycleStatusLabel");
+    if (cycleEl && palette.cycleLine) {
+      cycleEl.textContent = palette.cycleLine;
+    }
+
     const out = document.getElementById("timeOutput");
     if (out) {
-      out.textContent = `Real-time: ${formatTime12(nowHour)} • ${palette.name}`;
+      const w = window.DaylightTheme?.getWeather?.();
+      const weatherTag = w && w.temp !== null ? ` • ${Math.round(w.temp)}°C ${w.label}` : "";
+      out.textContent = `${formatTime12(nowHour)} • ${palette.name}${weatherTag}`;
       out.style.cursor = "default";
-      out.title = "Automatically synced with live clock";
     }
+  }
+
+  function fetchLocalWeather() {
+    if (!("geolocation" in navigator)) return;
+    navigator.geolocation.getCurrentPosition(
+      async (pos) => {
+        try {
+          const { latitude, longitude } = pos.coords;
+          const res = await fetch(
+            `https://api.open-meteo.com/v1/forecast?latitude=${latitude}&longitude=${longitude}&current_weather=true`
+          );
+          const data = await res.json();
+          const cw = data?.current_weather;
+          if (cw && window.DaylightTheme) {
+            const decoded = decodeWeatherCode(cw.weathercode);
+            window.DaylightTheme.setWeather({ ...decoded, temp: cw.temperature });
+            syncDaylight();
+          }
+        } catch (_) {}
+      },
+      () => {},
+      { timeout: 4000 }
+    );
   }
 
   if (window.DaylightChart) {
     window.DaylightChart.render();
   }
 
-  // Initial sync + automatic update every 60s when tab is active
   syncDaylight();
+  fetchLocalWeather();
+
   setInterval(() => {
     if (!document.hidden) syncDaylight();
   }, 60000);
 
-  // Instant sync when returning to the browser tab
+  setInterval(() => {
+    if (!document.hidden) fetchLocalWeather();
+  }, 15 * 60 * 1000);
+
   document.addEventListener("visibilitychange", () => {
     if (!document.hidden) syncDaylight();
   });

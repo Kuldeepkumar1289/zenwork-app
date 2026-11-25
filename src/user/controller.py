@@ -107,13 +107,25 @@ def register_organization(data: OrgRegisterRequest, db: Session) -> User:
 
 
 def create_employee_by_admin(data: AdminInviteEmployeeRequest, admin_user: User, db: Session):
-    """Admin-only: Onboards an employee into the Admin's company with a temporary password."""
+    """Admin-only: Onboards an employee with a manually entered Employee ID and temporary password."""
     clean_email = data.email.lower().strip()
     if db.query(User).filter(User.email == clean_email).first():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="This employee email is already registered."
         )
+
+    clean_emp_code = (data.employee_code or "").strip().upper() or None
+    if clean_emp_code:
+        existing_emp = db.query(User).filter(
+            func.lower(func.trim(User.company_name)) == (admin_user.company_name or "").strip().lower(),
+            func.upper(func.trim(User.employee_code)) == clean_emp_code
+        ).first()
+        if existing_emp:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Employee ID '{clean_emp_code}' is already in use within your organization."
+            )
 
     if data.manager_id:
         manager = db.query(User).filter(
@@ -135,6 +147,7 @@ def create_employee_by_admin(data: AdminInviteEmployeeRequest, admin_user: User,
     assigned_role = RoleTier.MEMBER if data.role_tier == RoleTier.ADMIN else data.role_tier
 
     employee = User(
+        employee_code=clean_emp_code,
         company_name=admin_user.company_name,
         company_code=admin_user.company_code,
         full_name=data.full_name.strip(),
@@ -152,6 +165,7 @@ def create_employee_by_admin(data: AdminInviteEmployeeRequest, admin_user: User,
     return {
         "employee": {
             "id": employee.id,
+            "employee_code": employee.employee_code,
             "company_name": employee.company_name,
             "company_code": employee.company_code,
             "full_name": employee.full_name,
@@ -193,6 +207,7 @@ def build_org_tree(user: User, visited: set[int] | None = None):
 
     return {
         "id": user.id,
+        "employee_code": getattr(user, "employee_code", None),
         "company_name": user.company_name,
         "company_code": user.company_code,
         "full_name": user.full_name,
@@ -202,6 +217,7 @@ def build_org_tree(user: User, visited: set[int] | None = None):
         "avatar_url": getattr(user, "avatar_url", None),
         "subordinates": subs
     }
+
 
 def change_user_password(data: ChangePasswordRequest, current_user: User, db: Session):
     if not verify_password(data.current_password, current_user.hashed_password):

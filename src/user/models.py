@@ -35,3 +35,4 @@ class User(Base):
     leave_balance = Column(Float, default=2.0, nullable=False)
     wfh_balance = Column(Float, default=2.0, nullable=False)
     last_quota_sync = Column(String(7), default=lambda: datetime.now().strftime("%Y-%m"), nullable=False)
+    employee_code = Column(String(40), nullable=True, index=True)

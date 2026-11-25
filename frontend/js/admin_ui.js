@@ -57,7 +57,7 @@ async function renderAdminSection() {
                 <div>
                     <h2 class="text-sm font-semibold text-gray-900">Onboard New Employee</h2>
                     <p class="text-[11px] text-gray-400">
-                        Creates an employee locked to <b>${currentUser.company_name}</b> (${currentUser.company_code || "ORG"}) with an auto-generated temporary password.
+                        Creates an employee locked to <b>${currentUser.company_name}</b> (${currentUser.company_code || "ORG"}) with your entered Employee ID and an auto-generated temporary password.
                     </p>
                 </div>
                 <span class="chip">Organization Locked</span>
@@ -65,20 +65,27 @@ async function renderAdminSection() {
 
             <form id="adminAddEmployeeForm" onsubmit="handleAdminAddEmployee(event)" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 text-xs">
                 <div>
+                    <label class="block font-medium text-gray-700 mb-1">Employee ID</label>
+                    <input type="text" id="admNewEmpCode" required placeholder="e.g. EMP-101"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200 uppercase">
+                </div>
+                <div>
                     <label class="block font-medium text-gray-700 mb-1">Employee Full Name</label>
-                    <input type="text" id="admNewEmpName" required placeholder="Priya Verma" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                    <input type="text" id="admNewEmpName" required placeholder="Priya Verma"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200">
                 </div>
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Work Email</label>
-                    <input type="email" id="admNewEmpEmail" required placeholder="priya@company.com" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                    <input type="email" id="admNewEmpEmail" required placeholder="priya@company.com"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200">
                 </div>
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Designation</label>
-                    <input type="text" id="admNewEmpDesig" required placeholder="Backend Developer" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                    <input type="text" id="admNewEmpDesig" required placeholder="Backend Developer"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200">
                 </div>
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Role Tier</label>
-                    <!-- Onboard New Employee Role Tier dropdown -->
                     <select id="admNewEmpRole" class="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white">
                         <option value="INTERN">INTERN</option>
                         <option value="MEMBER" selected>MEMBER</option>
@@ -89,10 +96,11 @@ async function renderAdminSection() {
                 </div>
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Reporting Manager ID (Optional)</label>
-                    <input type="number" id="admNewEmpMgr" placeholder="e.g. 1" class="w-full px-3 py-2 rounded-xl border border-gray-200">
+                    <input type="number" id="admNewEmpMgr" placeholder="e.g. 1"
+                        class="w-full px-3 py-2 rounded-xl border border-gray-200">
                 </div>
-                <div class="flex items-end">
-                    <button type="submit" id="admAddEmpBtn" class="w-full py-2 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white font-semibold cursor-pointer">
+                <div class="sm:col-span-2 lg:col-span-3 flex justify-end pt-1">
+                    <button type="submit" id="admAddEmpBtn" class="w-full sm:w-auto py-2.5 px-5 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white font-semibold cursor-pointer">
                         + Create Employee Account
                     </button>
                 </div>
@@ -143,7 +151,9 @@ async function handleAdminAddEmployee(e) {
 
     try {
         const mgrVal = document.getElementById("admNewEmpMgr").value.trim();
+        const empCodeVal = document.getElementById("admNewEmpCode").value.trim();
         const res = await apiRequest("/users/admin/add-employee", "POST", {
+            employee_code: empCodeVal,
             full_name: document.getElementById("admNewEmpName").value.trim(),
             email: document.getElementById("admNewEmpEmail").value.trim(),
             designation: document.getElementById("admNewEmpDesig").value.trim(),
@@ -155,9 +165,9 @@ async function handleAdminAddEmployee(e) {
         if (credsBox) {
             credsBox.classList.remove("hidden");
             credsBox.innerHTML = `
-                <b>✓ Employee Account Created!</b> Share these first-login credentials with <b>${res.employee.full_name}</b>:<br>
+                <b>✓ Employee Account Created!</b> Share these first-login credentials with <b>${res.employee.full_name}</b> (${res.employee.employee_code || "#" + res.employee.id}):<br>
                 <div class="mt-1.5 font-mono text-[12px] bg-white px-3 py-2 rounded-lg border border-[#A7F3D0]">
-                    Email: <b>${res.employee.email}</b> &nbsp;|&nbsp; Temporary Password: <b>${res.temp_password}</b>
+                    Employee ID: <b>${res.employee.employee_code || "#" + res.employee.id}</b> &nbsp;|&nbsp; Email: <b>${res.employee.email}</b> &nbsp;|&nbsp; Temporary Password: <b>${res.temp_password}</b>
                 </div>
                 <span class="block mt-1 text-[11px] opacity-80">The employee will set their own personal password upon first sign-in.</span>
             `;
@@ -193,9 +203,10 @@ async function loadAdminDashboardData() {
         const tbody = document.getElementById("adminUsersTableBody");
         tbody.innerHTML = users.map(u => {
             const isSelf = u.id === currentUser.id;
+            const displayId = u.employee_code || `#${parseInt(u.id, 10) || u.id}`;
             return `
                 <tr class="hover:bg-[#F9FBFA]">
-                    <td class="py-3 text-gray-400 font-mono">#${parseInt(u.id, 10) || u.id}</td>
+                    <td class="py-3 text-gray-700 font-mono font-semibold">${displayId}</td>
                     <td class="py-3">
                         <p class="font-semibold text-gray-900">${u.full_name} ${isSelf ? '<span class="text-[10px] text-[#1E6B52]">(You)</span>' : ''}</p>
                         <p class="text-[11px] text-gray-400">${u.email}</p>

@@ -13,6 +13,7 @@ class OrgRegisterRequest(BaseModel):
 
 
 class AdminInviteEmployeeRequest(BaseModel):
+    employee_code: Optional[str] = None
     full_name: str
     email: EmailStr
     designation: str = "Team Member"
@@ -34,6 +35,7 @@ class UserLogin(BaseModel):
 
 class UserResponse(BaseModel):
     id: int
+    employee_code: Optional[str] = None
     company_name: str
     company_code: Optional[str] = None
     full_name: str
@@ -55,6 +57,7 @@ class TokenResponse(BaseModel):
 
 class OrgNodeResponse(BaseModel):
     id: int
+    employee_code: Optional[str] = None
     company_name: str
     company_code: Optional[str] = None
     full_name: str

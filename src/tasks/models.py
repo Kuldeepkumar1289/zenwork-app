@@ -16,6 +16,7 @@ class TaskStatus(str, Enum):
     TODO = "TODO"
     IN_PROGRESS = "IN_PROGRESS"
     BLOCKED = "BLOCKED"
+    PENDING_REVIEW = "PENDING_REVIEW"
     COMPLETED = "COMPLETED"
 
 class Task(Base):
@@ -39,6 +40,11 @@ class Task(Base):
 
     creator = relationship("User", foreign_keys=[created_by_id])
     assignee = relationship("User", foreign_keys=[assigned_to_id])
+
+    completion_report = Column(Text, nullable=True)
+    review_notes = Column(Text, nullable=True)
+    reviewed_by_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    reviewer = relationship("User", foreign_keys=[reviewed_by_id])
 
 
 class BlockerLog(Base):

@@ -4,6 +4,7 @@ from pydantic import BaseModel, ConfigDict
 from src.tasks.models import TaskPriority, TaskStatus
 from src.user.dtos import UserResponse
 
+
 class TaskCreate(BaseModel):
     title: str
     description: Optional[str] = None
@@ -13,25 +14,32 @@ class TaskCreate(BaseModel):
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
 
+
 class TaskUpdateStatus(BaseModel):
     status: TaskStatus
+    completion_report: Optional[str] = None
+    review_notes: Optional[str] = None
+
 
 class TaskResponse(BaseModel):
     id: int
     title: str
-    description: Optional[str]
+    description: Optional[str] = None
     priority: TaskPriority
     status: TaskStatus
-    due_date: Optional[datetime]
+    due_date: Optional[datetime] = None
+    completion_report: Optional[str] = None
+    review_notes: Optional[str] = None
+    reviewed_by_id: Optional[int] = None
     created_by_id: int
-    assigned_to_id: Optional[int]
+    assigned_to_id: Optional[int] = None
     created_at: datetime
     creator: Optional[UserResponse] = None
-
-    model_config = ConfigDict(from_attributes=True)
     assignee: Optional[UserResponse] = None
     attachment_url: Optional[str] = None
     attachment_name: Optional[str] = None
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class TaskAnalyticsResponse(BaseModel):
@@ -44,8 +52,10 @@ class TaskAnalyticsResponse(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
+
 class ReportBlockerRequest(BaseModel):
     reason: str
+
 
 class BlockerResponse(BaseModel):
     id: int
@@ -63,6 +73,6 @@ class EscalationItem(BaseModel):
     task_id: int
     task_title: str
     assignee_name: str
-    manager_name: Optional[str]
+    manager_name: Optional[str] = None
     blocker_reason: str
     reported_at: datetime

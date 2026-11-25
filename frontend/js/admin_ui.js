@@ -78,9 +78,13 @@ async function renderAdminSection() {
                 </div>
                 <div>
                     <label class="block font-medium text-gray-700 mb-1">Role Tier</label>
+                    <!-- Onboard New Employee Role Tier dropdown -->
                     <select id="admNewEmpRole" class="w-full px-3 py-2 rounded-xl border border-gray-200 bg-white">
-                        <option value="MEMBER">MEMBER</option>
+                        <option value="INTERN">INTERN</option>
+                        <option value="MEMBER" selected>MEMBER</option>
+                        <option value="TEAM_LEAD">TEAM_LEAD</option>
                         <option value="MANAGER">MANAGER</option>
+                        <option value="HR">HR</option>
                     </select>
                 </div>
                 <div>
@@ -203,11 +207,12 @@ async function loadAdminDashboardData() {
                     </td>
                     <td class="py-3">
                         <select id="role-${u.id}" class="px-2.5 py-1 rounded-lg border border-gray-200 text-xs font-medium ${u.role_tier === 'ADMIN' ? 'bg-amber-50 text-amber-800 border-amber-200' : ''}">
-                            <option value="MEMBER" ${u.role_tier === 'MEMBER' ? 'selected' : ''}>MEMBER</option>
-                            <option value="MANAGER" ${u.role_tier === 'MANAGER' ? 'selected' : ''}>MANAGER</option>
-                            <option value="ADMIN" ${u.role_tier === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
                             <option value="INTERN" ${u.role_tier === 'INTERN' ? 'selected' : ''}>INTERN</option>
-
+                            <option value="MEMBER" ${u.role_tier === 'MEMBER' ? 'selected' : ''}>MEMBER</option>
+                            <option value="TEAM_LEAD" ${u.role_tier === 'TEAM_LEAD' ? 'selected' : ''}>TEAM_LEAD</option>
+                            <option value="MANAGER" ${u.role_tier === 'MANAGER' ? 'selected' : ''}>MANAGER</option>
+                            <option value="HR" ${u.role_tier === 'HR' ? 'selected' : ''}>HR</option>
+                            <option value="ADMIN" ${u.role_tier === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
                         </select>
                     </td>
                     <td class="py-3 text-right whitespace-nowrap space-x-2">

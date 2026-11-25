@@ -438,7 +438,10 @@ function renderFilteredLeavesTable() {
         return;
     }
 
-    const canApprove = currentUser && (currentUser.role_tier === "ADMIN" || currentUser.role_tier === "MANAGER");
+const canApprove = Boolean(
+    currentUser &&
+    (currentUser.role_tier === "MANAGER" || currentUser.role_tier === "HR")
+);
 
     tbody.innerHTML = list.map(item => {
         const statusBadges = {
@@ -553,10 +556,13 @@ async function loadRegularizations() {
                     <td class="py-3 pr-3 text-gray-500 max-w-xs truncate">${r.reason}</td>
                     <td class="py-3 pr-3"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${badges[r.status]}">${r.status}</span></td>
                     <td class="py-3 text-right whitespace-nowrap space-x-2">
-                        ${(canApprove && r.status === "PENDING") ? `
-                            <button onclick="reviewRegAction(${r.id}, 'APPROVED')" class="px-2.5 py-1 rounded-lg bg-[#1E6B52] text-white text-[11px] hover:bg-[#15523E]">Approve</button>
-                            <button onclick="reviewRegAction(${r.id}, 'REJECTED')" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] hover:bg-red-100">Reject</button>
-                        ` : `<span class="text-[11px] text-gray-400">—</span>`}
+                        ${(canApprove && item.status === "PENDING")
+                            ? `
+                                <button onclick="reviewLeaveAction(${item.id}, 'APPROVED')" class="px-2.5 py-1 rounded-lg bg-[#1E6B52] text-white text-[11px] hover:bg-[#15523E]">Approve</button>
+                                <button onclick="reviewLeaveAction(${item.id}, 'REJECTED')" class="px-2.5 py-1 rounded-lg bg-red-50 text-red-600 text-[11px] hover:bg-red-100">Reject</button>
+                            `
+                            : `<span class="text-[11px] text-gray-400">${currentUser?.role_tier === "ADMIN" && item.status === "PENDING" ? "Manager / HR only" : "—"}</span>`
+                        }
                     </td>
                 </tr>`;
         }).join("");

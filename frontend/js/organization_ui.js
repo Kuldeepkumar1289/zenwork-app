@@ -98,9 +98,12 @@ function drawOrganization() {
     : emptyState("No organization members found in this workspace yet.");
 
   const roleGroups = [
-    { tier: "ADMIN",   title: "Tier 1 • Workspace Admins",   desc: "Full system control, user provisioning, and final approvals" },
-    { tier: "MANAGER", title: "Tier 2 • Team Managers",      desc: "Department leads managing tasks, leaves, and direct reports" },
-    { tier: "MEMBER",  title: "Tier 3 • Team Members",       desc: "Individual contributors executing assigned tasks and sprints" }
+    { tier: "ADMIN",     title: "Workspace Admins",     desc: "Workspace management, events, holidays, onboarding & role setup" },
+    { tier: "HR",        title: "Human Resources (HR)", desc: "People operations, leave/WFH governance & employee support" },
+    { tier: "MANAGER",   title: "Team Managers",        desc: "Leave/WFH approvals, team escalations & performance review" },
+    { tier: "TEAM_LEAD", title: "Team Leads (TL)",      desc: "Task assignment, completion verification & work report sign-off" },
+    { tier: "MEMBER",    title: "Team Members",         desc: "Core task execution, reporting, attendance & leave requests" },
+    { tier: "INTERN",    title: "Interns",              desc: "Guided deliverables, progress reports & shift tracking" }
   ];
 
   const rolesHtml = roleGroups.map(group => {

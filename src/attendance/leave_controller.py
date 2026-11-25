@@ -91,14 +91,22 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
     if not applicant or applicant.company_name != current_user.company_name:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to a different workspace.")
 
-    # Access check: Admin or direct reporting manager
-    is_admin = current_user.role_tier == RoleTier.ADMIN
-    is_manager = current_user.role_tier == RoleTier.MANAGER and leave.user_id in (get_subordinate_ids(current_user) or [])
-
-    if not (is_admin or is_manager):
+    if current_user.role_tier == RoleTier.ADMIN:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Unauthorized: Only Admins or reporting Managers can approve this request."
+            detail="Admin manages workspace operations; Leave/WFH approvals are handled by the member's reporting Manager or HR."
+        )
+
+    is_direct_manager = (
+        current_user.role_tier == RoleTier.MANAGER
+        and (applicant.manager_id == current_user.id or leave.user_id in (get_subordinate_ids(current_user) or []))
+    )
+    is_hr = current_user.role_tier == RoleTier.HR
+
+    if not (is_direct_manager or is_hr):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Unauthorized: Only the member's reporting Manager or HR can approve/reject Leave & WFH requests."
         )
 
     # Deduct balance ONLY when Manager/Admin approves (and prevent double deduction)

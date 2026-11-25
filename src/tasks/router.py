@@ -2,9 +2,10 @@ import os
 import uuid
 from typing import List
 from fastapi import APIRouter, Depends, status, UploadFile, File, HTTPException
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from src.utils.db import get_db
+from src.utils.db import engine, get_db
 from src.utils.dependencies import get_current_user
 from src.user.models import User, RoleTier
 from src.tasks.models import Task
@@ -29,6 +30,15 @@ from src.tasks.controller import (
 )
 from src.worker.tasks import check_overdue_tasks_and_alert
 
+try:
+    with engine.begin() as conn:
+        conn.execute(text("ALTER TABLE tasks MODIFY COLUMN status VARCHAR(32) NOT NULL DEFAULT 'TODO'"))
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS completion_report TEXT NULL"))
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS review_notes TEXT NULL"))
+        conn.execute(text("ALTER TABLE tasks ADD COLUMN IF NOT EXISTS reviewed_by_id INT NULL"))
+except Exception:
+    pass
+
 UPLOAD_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../uploads"))
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
@@ -36,6 +46,7 @@ task_router = APIRouter(prefix="/tasks", tags=["Task Delegation & Tracking"])
 
 
 @task_router.post("", response_model=TaskResponse, status_code=status.HTTP_201_CREATED)
+@task_router.post("/", response_model=TaskResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def delegate_task(
     data: TaskCreate,
     current_user: User = Depends(get_current_user),
@@ -46,6 +57,7 @@ def delegate_task(
 
 
 @task_router.get("", response_model=List[TaskResponse])
+@task_router.get("/", response_model=List[TaskResponse], include_in_schema=False)
 def list_tasks(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -61,7 +73,7 @@ def modify_status(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Update task status (TODO, IN_PROGRESS, BLOCKED, COMPLETED)."""
+    """Update task status (TODO, IN_PROGRESS, PENDING_REVIEW, BLOCKED, COMPLETED)."""
     return update_task_status(task_id=task_id, data=data, current_user=current_user, db=db)
 
 
@@ -125,11 +137,10 @@ async def attach_file_to_task(
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, 
+            status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
 
-    # Permission check: Only assignee, creator, team manager, or admin can attach
     subordinate_ids = get_subordinate_ids(current_user)
     if (
         task.assigned_to_id != current_user.id
@@ -138,7 +149,7 @@ async def attach_file_to_task(
         and current_user.role_tier != RoleTier.ADMIN
     ):
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, 
+            status_code=status.HTTP_403_FORBIDDEN,
             detail="Not authorized to attach files to this task."
         )
 

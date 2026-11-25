@@ -123,12 +123,12 @@ def create_employee_by_admin(data: AdminInviteEmployeeRequest, admin_user: User,
         if not manager:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Reporting manager not found in your organization."
+                detail="Reporting manager/lead not found in your organization."
             )
-        if manager.role_tier not in [RoleTier.MANAGER, RoleTier.ADMIN]:
+        if manager.role_tier not in [RoleTier.MANAGER, RoleTier.TEAM_LEAD, RoleTier.HR, RoleTier.ADMIN]:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Selected reporting manager does not have approval permissions."
+                detail="Selected reporting lead does not have team supervision permissions."
             )
 
     raw_temp_password = (data.temp_password or "").strip() or _generate_temp_password(10)

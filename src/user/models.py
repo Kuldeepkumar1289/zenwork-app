@@ -6,9 +6,12 @@ from src.utils.db import Base
 
 
 class RoleTier(str, Enum):
-    ADMIN = "ADMIN"
-    MANAGER = "MANAGER"
+    INTERN = "INTERN"
     MEMBER = "MEMBER"
+    TEAM_LEAD = "TEAM_LEAD"
+    MANAGER = "MANAGER"
+    HR = "HR"
+    ADMIN = "ADMIN"
 
 
 class User(Base):

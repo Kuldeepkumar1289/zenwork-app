@@ -7,7 +7,7 @@ async function renderTasksSection() {
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
                 <h1 class="text-2xl font-semibold text-gray-900">Tasks</h1>
-                <p class="text-xs text-gray-500 mt-0.5">All tasks. Clear ownership, real-time blockers, and attachments.</p>
+                <p class="text-xs text-gray-500 mt-0.5">All tasks. Clear ownership, completion reports, and TL/Manager sign-off.</p>
             </div>
             <button onclick="openTaskModal()" class="bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-medium px-4 py-2.5 rounded-xl transition cursor-pointer">
                 + Create task
@@ -21,6 +21,7 @@ async function renderTasksSection() {
                         <button onclick="setTaskTabFilter('ALL')" id="tab-task-ALL" class="task-filter-btn px-3 py-1.5 rounded-lg bg-[#EBF3EF] text-[#1E6B52] font-medium">All tasks</button>
                         <button onclick="setTaskTabFilter('TODO')" id="tab-task-TODO" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">To Do</button>
                         <button onclick="setTaskTabFilter('IN_PROGRESS')" id="tab-task-IN_PROGRESS" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">In Progress</button>
+                        <button onclick="setTaskTabFilter('PENDING_REVIEW')" id="tab-task-PENDING_REVIEW" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">Pending Review</button>
                         <button onclick="setTaskTabFilter('BLOCKED')" id="tab-task-BLOCKED" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">Blocked</button>
                         <button onclick="setTaskTabFilter('COMPLETED')" id="tab-task-COMPLETED" class="task-filter-btn px-3 py-1.5 rounded-lg text-gray-500 hover:bg-gray-50">Completed</button>
                     </div>
@@ -45,7 +46,7 @@ async function renderTasksSection() {
             </div>
 
             <div id="taskDetailDrawer" class="col-span-12 lg:col-span-4 bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 lg:sticky lg:top-0">
-                <p class="text-xs text-gray-400 text-center py-10">Select any task from the list to view details or report blockers.</p>
+                <p class="text-xs text-gray-400 text-center py-10">Select any task from the list to view details, submit reports, or review completion.</p>
             </div>
         </div>
     `;
@@ -87,6 +88,7 @@ function renderMasterTasksList() {
     const statusColors = {
         "TODO": "bg-gray-100 text-gray-700",
         "IN_PROGRESS": "bg-amber-50 text-amber-700 border border-amber-200",
+        "PENDING_REVIEW": "bg-sky-50 text-sky-700 border border-sky-200",
         "BLOCKED": "bg-red-50 text-red-700 border border-red-200",
         "COMPLETED": "bg-[#E6F4EA] text-[#1E6B52]"
     };
@@ -105,11 +107,11 @@ function renderMasterTasksList() {
         return `
             <tr onclick="selectTaskDetail(${task.id})" class="cursor-pointer transition ${isSelected ? 'bg-[#F2F8F5]' : 'hover:bg-[#F9FBFA]'}">
                 <td class="py-3.5 pr-2">
-                    <p class="font-semibold text-gray-900">${task.title}</p>
-                    <p class="text-[11px] text-gray-400 truncate max-w-[200px] sm:max-w-xs">${task.description || 'No description provided'}</p>
+                    <p class="font-semibold text-gray-900">${esc(task.title)}</p>
+                    <p class="text-[11px] text-gray-400 truncate max-w-[200px] sm:max-w-xs">${esc(task.description || 'No description provided')}</p>
                 </td>
-                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${priorityBadges[task.priority]}">${task.priority}</span></td>
-                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColors[task.status]}">${task.status.replace("_", " ")}</span></td>
+                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${priorityBadges[task.priority] || ''}">${esc(task.priority)}</span></td>
+                <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColors[task.status] || ''}">${esc(task.status.replace("_", " "))}</span></td>
                 <td class="py-3.5 text-right text-gray-500 whitespace-nowrap">${dueStr}</td>
             </tr>
         `;
@@ -129,27 +131,107 @@ function renderTaskDetailDrawer(taskId) {
     if (!drawer || !task) return;
 
     const dueFull = task.due_date ? new Date(task.due_date).toLocaleString() : "No deadline";
+    const role = currentUser?.role_tier;
+    const isReviewer = Boolean(role && ["TEAM_LEAD", "MANAGER"].includes(role));
+    const isExecutor = Boolean(role && ["MEMBER", "INTERN"].includes(role));
 
     drawer.innerHTML = `
         <div class="flex items-center justify-between mb-2">
             <span class="text-[10px] font-semibold uppercase tracking-wider text-[#1E6B52]">TASK #${task.id}</span>
-            <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#F6F8F7] border border-[#E6ECE8] text-gray-600">${task.priority}</span>
+            <span class="text-[11px] px-2 py-0.5 rounded-full bg-[#F6F8F7] border border-[#E6ECE8] text-gray-600">${esc(task.priority)}</span>
         </div>
-        <h3 class="text-base font-semibold text-gray-900 leading-snug">${task.title}</h3>
-        <p class="text-xs text-gray-500 mt-2 leading-relaxed">${task.description || "No additional notes attached."}</p>
+        <h3 class="text-base font-semibold text-gray-900 leading-snug">${esc(task.title)}</h3>
+        <p class="text-xs text-gray-500 mt-2 leading-relaxed">${esc(task.description || "No additional notes attached.")}</p>
 
         <div class="mt-4 pt-4 border-t border-[#F0F4F2] space-y-2.5 text-xs">
             <div class="flex justify-between"><span class="text-gray-400">Assignee ID</span><span class="font-medium text-gray-800">User #${task.assigned_to_id || 'Unassigned'}</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">Status</span><span class="font-semibold text-[#1E6B52]">${task.status}</span></div>
+            <div class="flex justify-between"><span class="text-gray-400">Status</span><span class="font-semibold text-[#1E6B52]">${esc(task.status)}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Deadline</span><span class="font-medium text-gray-800">${dueFull}</span></div>
+            ${task.completion_report ? `
+                <div class="p-2.5 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8]">
+                    <span class="block text-[10px] font-semibold text-gray-500 mb-1">Submitted Work Report</span>
+                    <p class="text-gray-800">${esc(task.completion_report)}</p>
+                </div>` : ""}
+            ${task.review_notes ? `
+                <div class="p-2.5 rounded-xl bg-amber-50 border border-amber-200">
+                    <span class="block text-[10px] font-semibold text-amber-800 mb-1">TL / Manager Review Note</span>
+                    <p class="text-amber-900">${esc(task.review_notes)}</p>
+                </div>` : ""}
         </div>
 
         <div class="mt-5 pt-4 border-t border-[#F0F4F2] space-y-2">
-            ${task.status !== 'COMPLETED' ? `<button onclick="updateTaskStatusFromDrawer(${task.id}, 'COMPLETED')" class="w-full py-2.5 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold transition cursor-pointer">✓ Mark Complete</button>` : ''}
-            ${task.status === 'TODO' ? `<button onclick="updateTaskStatusFromDrawer(${task.id}, 'IN_PROGRESS')" class="w-full py-2 px-4 rounded-xl bg-[#EBF3EF] text-[#1E6B52] text-xs font-semibold hover:bg-[#DCECE4] transition cursor-pointer">▶ Start Progress</button>` : ''}
-            ${task.status !== 'BLOCKED' && task.status !== 'COMPLETED' ? `<button onclick="promptBlocker(${task.id})" class="w-full py-2 px-4 rounded-xl border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition cursor-pointer">⚠ Report Blocker</button>` : ''}
+            ${task.status === 'TODO' ? `
+                <button onclick="updateTaskStatusFromDrawer(${task.id}, 'IN_PROGRESS')" class="w-full py-2 px-4 rounded-xl bg-[#EBF3EF] text-[#1E6B52] text-xs font-semibold hover:bg-[#DCECE4] transition cursor-pointer">
+                    ▶ Start Progress
+                </button>` : ''}
+
+            ${isExecutor && task.status !== 'COMPLETED' ? `
+                <textarea id="taskReportInput-${task.id}" rows="2" placeholder="Write completion / work report for TL or Manager..."
+                    class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs">${esc(task.completion_report || "")}</textarea>
+                <button onclick="submitTaskReportForReview(${task.id})" class="w-full py-2.5 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold transition cursor-pointer">
+                    Submit Report for Review
+                </button>` : ''}
+
+            ${isReviewer && task.status !== 'COMPLETED' ? `
+                <textarea id="taskReviewNoteInput-${task.id}" rows="2" placeholder="Optional review note or revision feedback..."
+                    class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs">${esc(task.review_notes || "")}</textarea>
+                <button onclick="reviewTaskCompletionAction(${task.id}, 'COMPLETED')" class="w-full py-2.5 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold transition cursor-pointer">
+                    ✓ Approve &amp; Mark Completed
+                </button>
+                <button onclick="reviewTaskCompletionAction(${task.id}, 'IN_PROGRESS')" class="w-full py-2 px-4 rounded-xl bg-[#EBF3EF] text-[#1E6B52] text-xs font-semibold hover:bg-[#DCECE4] transition cursor-pointer">
+                    ↩ Request Revision
+                </button>` : ''}
+
+            ${!isExecutor && !isReviewer && task.status !== 'COMPLETED' ? `
+                <p class="text-[11px] text-gray-400 text-center py-1">Task completion &amp; report sign-off is handled by Team Lead / Manager.</p>` : ''}
+
+            ${task.status !== 'BLOCKED' && task.status !== 'COMPLETED' ? `
+                <button onclick="promptBlocker(${task.id})" class="w-full py-2 px-4 rounded-xl border border-red-200 text-red-600 text-xs font-medium hover:bg-red-50 transition cursor-pointer">
+                    ⚠ Report Blocker
+                </button>` : ''}
         </div>
     `;
+}
+
+async function submitTaskReportForReview(taskId) {
+    const reportEl = document.getElementById(`taskReportInput-${taskId}`);
+    const report = reportEl ? reportEl.value.trim() : "";
+    if (!report) {
+        if (typeof showToast === "function") showToast("Please write a completion report first.", "error");
+        else alert("Please write a completion report first.");
+        return;
+    }
+    try {
+        await apiRequest(`/tasks/${taskId}/status`, "PATCH", {
+            status: "PENDING_REVIEW",
+            completion_report: report
+        });
+        if (typeof showToast === "function") showToast("Report submitted for TL / Manager review.", "success");
+        await loadTasks();
+        renderMasterTasksList();
+    } catch (err) {
+        if (typeof showToast === "function") showToast(err.message, "error");
+        else alert(err.message);
+    }
+}
+
+async function reviewTaskCompletionAction(taskId, targetStatus) {
+    const noteEl = document.getElementById(`taskReviewNoteInput-${taskId}`);
+    const reviewNotes = noteEl ? noteEl.value.trim() : "";
+    try {
+        await apiRequest(`/tasks/${taskId}/status`, "PATCH", {
+            status: targetStatus,
+            review_notes: reviewNotes || null
+        });
+        if (typeof showToast === "function") {
+            showToast(targetStatus === "COMPLETED" ? "Task approved & completed!" : "Sent back for revision.", "success");
+        }
+        await loadTasks();
+        renderMasterTasksList();
+    } catch (err) {
+        if (typeof showToast === "function") showToast(err.message, "error");
+        else alert(err.message);
+    }
 }
 
 async function updateTaskStatusFromDrawer(taskId, newStatus) {
@@ -158,7 +240,8 @@ async function updateTaskStatusFromDrawer(taskId, newStatus) {
         await loadTasks();
         renderMasterTasksList();
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
+        else alert(err.message);
     }
 }
 
@@ -166,10 +249,11 @@ async function promptBlocker(taskId) {
     const reason = prompt("What is blocking this task?");
     if (!reason) return;
     try {
-        await apiRequest(`/tasks/${taskId}/blocker`, "POST", { reason });
+        await apiRequest(`/tasks/${taskId}/block`, "POST", { reason });
         await loadTasks();
         renderMasterTasksList();
     } catch (err) {
-        alert(err.message);
+        if (typeof showToast === "function") showToast(err.message, "error");
+        else alert(err.message);
     }
 }

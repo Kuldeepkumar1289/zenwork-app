@@ -37,6 +37,7 @@ try:
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS avatar_url TEXT NULL"))
         conn.execute(text("ALTER TABLE users MODIFY COLUMN avatar_url TEXT NULL"))
         conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN NOT NULL DEFAULT FALSE"))
+        conn.execute(text("ALTER TABLE users MODIFY COLUMN role_tier VARCHAR(32) NOT NULL DEFAULT 'MEMBER'"))
 except Exception:
     pass
 

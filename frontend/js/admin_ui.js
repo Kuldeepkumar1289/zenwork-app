@@ -206,6 +206,8 @@ async function loadAdminDashboardData() {
                             <option value="MEMBER" ${u.role_tier === 'MEMBER' ? 'selected' : ''}>MEMBER</option>
                             <option value="MANAGER" ${u.role_tier === 'MANAGER' ? 'selected' : ''}>MANAGER</option>
                             <option value="ADMIN" ${u.role_tier === 'ADMIN' ? 'selected' : ''}>ADMIN</option>
+                            <option value="INTERN" ${u.role_tier === 'INTERN' ? 'selected' : ''}>INTERN</option>
+
                         </select>
                     </td>
                     <td class="py-3 text-right whitespace-nowrap space-x-2">

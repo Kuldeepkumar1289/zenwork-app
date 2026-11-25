@@ -1,5 +1,4 @@
-/*  AUTOMATIC THEME SYNC FOR ALL STATUS BADGES & ACCENTS
-   Overrides hardcoded green/amber/red classes across all modules */
+/*  AUTOMATIC THEME SYNC FOR ALL STATUS BADGES & ACCENTS  */
 :root {
   --tone-1-bg: #E6F4EA;
   --tone-1-ink: #1E6B52;
@@ -9,7 +8,6 @@
   --tone-3-ink: #BE185D;
 }
 
-/* Sync hardcoded green brand hexes (#1E6B52 / #1D6B52) to active --accent */
 body .bg-\[\#1E6B52\],
 body .bg-\[\#1D6B52\] {
   background-color: var(--accent) !important;
@@ -31,7 +29,7 @@ body input[type="checkbox"] {
   accent-color: var(--accent) !important;
 }
 
-/* Tone 1 (Previously Green: Completed / Approved / Active / New) */
+/* Tone 1 (Completed / Approved / Active) */
 body .bg-\[\#E6F4EA\],
 body .bg-emerald-50,
 body .bg-emerald-100,
@@ -48,7 +46,7 @@ body .text-green-600 {
   color: var(--tone-1-ink) !important;
 }
 
-/* Tone 2 (Previously Yellow/Amber: In Progress / Pending / Due Dates / WFH) */
+/* Tone 2 (In Progress / Pending / Due Dates / WFH) */
 body .bg-\[\#FEF7E0\],
 body .bg-amber-50,
 body .bg-amber-100,
@@ -64,7 +62,7 @@ body .text-yellow-700 {
   color: var(--tone-2-ink) !important;
 }
 
-/* Tone 3 (Previously Harsh Red: Blocked / High Priority / Rejected) */
+/* Tone 3 (Blocked / High Priority / Rejected) */
 body .bg-red-50,
 body .bg-red-100,
 body .bg-rose-50,
@@ -79,7 +77,7 @@ body .text-rose-600 {
   color: var(--tone-3-ink) !important;
 }
 
-/* Calendar dots & agenda markers also follow active theme */
+/* Calendar dots & agenda markers */
 body .dots i,
 body .agenda-item > i,
 body .legend {
@@ -92,17 +90,17 @@ body .legend.ev {
   background: var(--accent) !important;
 }
 
-/* 1. Daytime crisp contrast for top hero & breadcrumbs */
+/* Daytime crisp contrast */
 .crumb,
 .crumb a,
 .crumb span,
 .kicker,
-#dashboardView > div:first-child p,
+#section-dashboard > div:first-child p,
 .page-head p {
   color: #334155;
 }
 
-/* 2. Left sidebar stays frosted glass so sidebar text never hides on dark skies */
+/* Left sidebar stays frosted glass on dark skies */
 body.is-night aside {
   background: rgba(255, 255, 255, 0.90) !important;
   backdrop-filter: blur(16px);
@@ -110,7 +108,7 @@ body.is-night aside {
   border-right: 1px solid rgba(255, 255, 255, 0.45) !important;
 }
 
-/* 3. Top Header Bar (Breadcrumb + Profile Name/Role) in crisp white at night */
+/* Top Header Bar at night */
 body.is-night header .crumb,
 body.is-night header .crumb *,
 body.is-night #topUserName,
@@ -123,7 +121,6 @@ body.is-night #topUserRole {
   color: rgba(255, 255, 255, 0.85) !important;
 }
 
-/* Keep top search box & icon buttons solid frosted white so placeholder is sharp */
 body.is-night header input,
 body.is-night header [class*="rounded-full"]:not(#topAvatar) {
   background-color: rgba(255, 255, 255, 0.94) !important;
@@ -134,7 +131,7 @@ body.is-night header input::placeholder {
   color: #64748B !important;
 }
 
-/* 4. Hero Greeting, Subtitle, Date & Sub-page Headers in crisp white at night */
+/* Hero Greeting, Subtitle, Date & Sub-page Headers at night */
 body.is-night #heroGreeting,
 body.is-night #heroDate,
 body.is-night .kicker,
@@ -149,7 +146,7 @@ body.is-night .hero p {
   color: rgba(255, 255, 255, 0.90) !important;
 }
 
-/* 5. Sky Arc footer text & Live/Preview badge pill */
+/* Sky Arc footer text */
 body.is-night .sky-wrap .muted,
 body.is-night .sky-wrap span,
 body.is-night .sky-wrap p {
@@ -165,13 +162,14 @@ body.is-night #timeOutput {
   backdrop-filter: blur(8px);
 }
 
-/* 6. Keep all lower cards, KPIs & modals bright white with dark text */
+/* Lower cards, KPIs & modals bright white with dark text */
 body.is-night .card,
 body.is-night .stat,
 body.is-night .kpi,
 body.is-night .bg-white {
   background: rgba(255, 255, 255, 0.96) !important;
 }
+
 /*  1. PAGE BASICS  */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 14px; }
 .page-head h1 { font-size: clamp(26px, 3.5vw, 40px); font-weight: 800; line-height: 1.1; }
@@ -253,18 +251,12 @@ body.is-night .bg-white {
 .chat-compose { display: flex; gap: 8px; padding: 12px 14px; border-top: 1px solid var(--line); }
 .chat-compose input { flex: 1; min-width: 0; padding: 10px 16px; border-radius: 999px; border: 1px solid var(--line); background: #ffffff66; outline: 0; }
 
-/* 6. VOICE */
-.room { display: flex; flex-direction: column; gap: 12px; }
-.room.is-live { outline: 2px solid var(--accent); }
-.faces { display: flex; gap: 6px; min-height: 30px; align-items: center; }
-.voice-bar { display: flex; align-items: center; gap: 14px; padding: 12px 18px; margin-top: 14px; position: sticky; top: 0; z-index: 2; }
-
-/* 7. QUERIES */
+/*  6. QUERIES  */
 .q-item { display: flex; align-items: flex-start; gap: 12px; padding: 14px 0; border-top: 1px solid var(--line); }
 .q-item > div { flex: 1; min-width: 0; }
 .q-item p { margin: 4px 0; font-size: 13px; }
 
-/* 8. ORGANIZATION */
+/*  7. ORGANIZATION  */
 .org-branch > summary { list-style: none; cursor: pointer; }
 .org-branch > summary::-webkit-details-marker { display: none; }
 .org-card { display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin: 6px 0; border-radius: 16px; border: 1px solid var(--line); background: #ffffff40; font-size: 13px; transition: opacity .2s, background .2s; }
@@ -281,7 +273,6 @@ body.is-night .bg-white {
   .chat-msgs { min-height: 260px; }
 }
 
-/* Hero subtitle stays dark by day and pure white on dark night themes */
 #heroSubtitle {
   color: #334155 !important;
 }
@@ -291,9 +282,6 @@ body.is-night #heroSubtitle {
   text-shadow: 0 1px 2px rgba(15, 23, 42, 0.35);
 }
 
-
-
-/* 1. Every page's main H1 title & subtitle (<p> right after H1) in crisp white at night */
 body.is-night main h1,
 body.is-night #section-dynamic h1 {
   color: #FFFFFF !important;
@@ -307,7 +295,6 @@ body.is-night #heroSubtitle {
   text-shadow: 0 1px 2px rgba(15, 23, 42, 0.3);
 }
 
-/* 2. Keep cards' internal headings dark so nothing turns white-on-white */
 body.is-night .card h1,
 body.is-night .card h2,
 body.is-night .card h3,
@@ -319,7 +306,6 @@ body.is-night .bg-white h2 {
   text-shadow: none !important;
 }
 
-/* 3. Top header search inputs, segmented toggles & outline buttons (e.g. + Apply WFH, Today, Find a teammate) */
 body.is-night #orgSearch,
 body.is-night #section-dynamic > div:first-child .seg,
 body.is-night #section-dynamic > div:first-child button:not(.btn-primary):not(.is-on),
@@ -365,7 +351,6 @@ body.is-night #orgSearch::placeholder {
   flex-shrink: 0;
 }
 
-/* Sleek thin custom scrollbars across Zenwork */
 .chat-msgs::-webkit-scrollbar,
 .chat-list::-webkit-scrollbar,
 aside::-webkit-scrollbar,

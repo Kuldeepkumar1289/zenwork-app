@@ -29,17 +29,18 @@ async function renderTasksSection() {
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="w-full min-w-[500px] text-left border-collapse">
+                    <table class="w-full min-w-[540px] text-left border-collapse">
                         <thead>
                             <tr class="border-b border-[#F0F4F2] text-[11px] font-semibold uppercase tracking-wider text-gray-400">
                                 <th class="py-2.5 pr-2">Task / Deliverable</th>
+                                <th class="py-2.5 pr-2">Assignee &amp; Live Status</th>
                                 <th class="py-2.5 pr-2">Priority</th>
                                 <th class="py-2.5 pr-2">Status</th>
                                 <th class="py-2.5 text-right">Due</th>
                             </tr>
                         </thead>
                         <tbody id="masterTasksBody" class="divide-y divide-[#F0F4F2] text-xs">
-                            <tr><td colspan="4" class="py-6 text-center text-gray-400">Loading tasks...</td></tr>
+                            <tr><td colspan="5" class="py-6 text-center text-gray-400">Loading tasks...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -51,7 +52,10 @@ async function renderTasksSection() {
         </div>
     `;
 
-    await loadTasks();
+    await Promise.all([
+        loadTasks(),
+        window.LivePresence ? window.LivePresence.refresh() : Promise.resolve()
+    ]);
     renderMasterTasksList();
 }
 
@@ -77,7 +81,7 @@ function renderMasterTasksList() {
     document.getElementById("tasksTabTotal").textContent = `${filtered.length} tasks`;
 
     if (!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="4" class="py-8 text-center text-gray-400">No tasks in this category.</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="5" class="py-8 text-center text-gray-400">No tasks in this category.</td></tr>`;
         return;
     }
 
@@ -103,12 +107,22 @@ function renderMasterTasksList() {
     tbody.innerHTML = filtered.map(task => {
         const isSelected = task.id === selectedTaskId;
         const dueStr = task.due_date ? new Date(task.due_date).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "—";
+        const assigneeLabel = task.assigned_to_id && window.LivePresence
+            ? window.LivePresence.formatNameWithId(task.assignee || task.assigned_to_id)
+            : (task.assigned_to_id ? `User #${task.assigned_to_id}` : "Unassigned");
+        const livePill = task.assigned_to_id && window.LivePresence
+            ? window.LivePresence.badgeHtml(task.assigned_to_id, true)
+            : "";
 
         return `
             <tr onclick="selectTaskDetail(${task.id})" class="cursor-pointer transition ${isSelected ? 'bg-[#F2F8F5]' : 'hover:bg-[#F9FBFA]'}">
                 <td class="py-3.5 pr-2">
                     <p class="font-semibold text-gray-900">${esc(task.title)}</p>
-                    <p class="text-[11px] text-gray-400 truncate max-w-[200px] sm:max-w-xs">${esc(task.description || 'No description provided')}</p>
+                    <p class="text-[11px] text-gray-400 truncate max-w-[180px] sm:max-w-xs">${esc(task.description || 'No description provided')}</p>
+                </td>
+                <td class="py-3.5 pr-2">
+                    <p class="font-medium text-gray-800 whitespace-nowrap">${esc(assigneeLabel)}</p>
+                    <div class="mt-0.5">${livePill}</div>
                 </td>
                 <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2 py-0.5 rounded-md text-[10px] font-medium ${priorityBadges[task.priority] || ''}">${esc(task.priority)}</span></td>
                 <td class="py-3.5 pr-2 whitespace-nowrap"><span class="px-2.5 py-1 rounded-full text-[10px] font-semibold ${statusColors[task.status] || ''}">${esc(task.status.replace("_", " "))}</span></td>
@@ -135,6 +149,13 @@ function renderTaskDetailDrawer(taskId) {
     const isReviewer = Boolean(role && ["TEAM_LEAD", "MANAGER"].includes(role));
     const isExecutor = Boolean(role && ["MEMBER", "INTERN"].includes(role));
 
+    const assigneeText = task.assigned_to_id && window.LivePresence
+        ? window.LivePresence.formatNameWithId(task.assignee || task.assigned_to_id)
+        : (task.assigned_to_id ? `User #${task.assigned_to_id}` : "Unassigned");
+    const assigneeStatusBadge = task.assigned_to_id && window.LivePresence
+        ? window.LivePresence.badgeHtml(task.assigned_to_id)
+        : "";
+
     drawer.innerHTML = `
         <div class="flex items-center justify-between mb-2">
             <span class="text-[10px] font-semibold uppercase tracking-wider text-[#1E6B52]">TASK #${task.id}</span>
@@ -144,8 +165,12 @@ function renderTaskDetailDrawer(taskId) {
         <p class="text-xs text-gray-500 mt-2 leading-relaxed">${esc(task.description || "No additional notes attached.")}</p>
 
         <div class="mt-4 pt-4 border-t border-[#F0F4F2] space-y-2.5 text-xs">
-            <div class="flex justify-between"><span class="text-gray-400">Assignee ID</span><span class="font-medium text-gray-800">User #${task.assigned_to_id || 'Unassigned'}</span></div>
-            <div class="flex justify-between"><span class="text-gray-400">Status</span><span class="font-semibold text-[#1E6B52]">${esc(task.status)}</span></div>
+            <div class="flex justify-between items-center gap-2">
+                <span class="text-gray-400">Assignee</span>
+                <span class="font-medium text-gray-800 text-right">${esc(assigneeText)}</span>
+            </div>
+            ${assigneeStatusBadge ? `<div class="flex justify-between items-center gap-2"><span class="text-gray-400">Live Status</span><span>${assigneeStatusBadge}</span></div>` : ""}
+            <div class="flex justify-between"><span class="text-gray-400">Task Status</span><span class="font-semibold text-[#1E6B52]">${esc(task.status.replace("_", " "))}</span></div>
             <div class="flex justify-between"><span class="text-gray-400">Deadline</span><span class="font-medium text-gray-800">${dueFull}</span></div>
             ${task.completion_report ? `
                 <div class="p-2.5 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8]">
@@ -166,7 +191,7 @@ function renderTaskDetailDrawer(taskId) {
                 </button>` : ''}
 
             ${isExecutor && task.status !== 'COMPLETED' ? `
-                <textarea id="taskReportInput-${task.id}" rows="2" placeholder="Write completion / work report for TL or Manager..."
+                <textarea id="taskReportInput-${task.id}" rows="2" placeholder="Summarize what you completed for TL/Manager review..."
                     class="w-full px-3 py-2 rounded-xl border border-gray-200 text-xs">${esc(task.completion_report || "")}</textarea>
                 <button onclick="submitTaskReportForReview(${task.id})" class="w-full py-2.5 px-4 rounded-xl bg-[#1E6B52] hover:bg-[#15523E] text-white text-xs font-semibold transition cursor-pointer">
                     Submit Report for Review

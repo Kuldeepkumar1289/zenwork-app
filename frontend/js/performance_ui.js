@@ -1,5 +1,3 @@
-
-
 async function renderPerformanceSection() {
   const perf = await fetchOr(API.analytics, {});
 
@@ -9,10 +7,25 @@ async function renderPerformanceSection() {
   const blocked = count(t => t.status === "BLOCKED");
   const overdue = count(t => t.status !== "COMPLETED" && t.due_date && new Date(t.due_date) < new Date());
   const rate    = total ? Math.round((done / total) * 100) : 0;
-  const score   = perf.overall_score !== undefined ? Math.round(perf.overall_score) + "%" : "--%";
 
-  const statuses = [["TODO", "To do"], ["IN_PROGRESS", "In progress"], ["BLOCKED", "Blocked"], ["COMPLETED", "Completed"]]
-    .map(([key, label]) => [label, count(t => t.status === key)]);
+  let scoreText = "--%";
+  if (perf.overall_score !== undefined) {
+    scoreText = Math.round(perf.overall_score) + "%";
+  } else if (perf.on_time_delivery_rate !== undefined || total > 0) {
+    const deliv = Math.round(perf.on_time_delivery_rate ?? rate);
+    const hrs = Number(perf.total_hours_logged || 0);
+    const bonus = hrs > 0 ? Math.min(20, Math.round(hrs * 2.5)) : 10;
+    const calc = Math.max(0, Math.min(100, Math.round((deliv * 0.8) + bonus - (blocked * 5))));
+    scoreText = calc + "%";
+  }
+
+  const statuses = [
+    ["TODO", "To do"],
+    ["IN_PROGRESS", "In progress"],
+    ["PENDING_REVIEW", "Pending review"],
+    ["BLOCKED", "Blocked"],
+    ["COMPLETED", "Completed"]
+  ].map(([key, label]) => [label, count(t => t.status === key)]);
 
   const priorities = ["LOW", "MEDIUM", "HIGH", "CRITICAL"]
     .map(p => [p[0] + p.slice(1).toLowerCase(), count(t => t.priority === p)]);
@@ -24,7 +37,7 @@ async function renderPerformanceSection() {
     ${pageHead("Performance", "A productive week, one step at a time.")}
 
     <div class="kpis">
-      ${kpi("Overall score", score, "From your analytics")}
+      ${kpi("Overall score", scoreText, "From your analytics")}
       ${kpi("Completion rate", rate + "%", `${done} of ${total} tasks`)}
       ${kpi("Overdue", overdue, "Not completed, past due")}
       ${kpi("Blocked", blocked, "Waiting on something")}

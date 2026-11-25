@@ -8,96 +8,8 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:wght@600;800&family=Figtree:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='24' fill='%231d6b52'/><text x='50' y='68' font-size='56' font-family='sans-serif' font-weight='bold' fill='white' text-anchor='middle'>Z</text></svg>">
-  <link rel="stylesheet" href="css/daylight.css">
-  <link rel="stylesheet" href="css/sections.css">
-
-  <style>
-    .mobile-header,
-    .mobile-close-btn,
-    .mobile-checkin-card {
-      display: none;
-    }
-
-    @media (max-width: 900px) {
-      .mobile-header {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        padding: 12px 16px;
-        background: rgba(255, 255, 255, 0.78);
-        backdrop-filter: blur(14px);
-        border-bottom: 1px solid rgba(15, 23, 42, 0.08);
-        position: sticky;
-        top: 0;
-        z-index: 900;
-        width: 100%;
-      }
-
-      .mobile-checkin-card {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        padding: 14px 16px;
-        margin-top: 12px;
-        border-radius: 18px;
-        background: rgba(255, 255, 255, 0.72);
-        border: 1px solid rgba(15, 23, 42, 0.08);
-        backdrop-filter: blur(12px);
-      }
-
-      .mobile-menu-toggle {
-        background: var(--accent, #1d6b52);
-        color: var(--accent-ink, #ffffff);
-        border: none;
-        padding: 8px 14px;
-        border-radius: 10px;
-        font-weight: 600;
-        font-size: 14px;
-        cursor: pointer;
-      }
-
-      .mobile-close-btn {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        width: 30px;
-        height: 30px;
-        border-radius: 8px;
-        background: rgba(15, 23, 42, 0.06);
-        font-size: 15px;
-        cursor: pointer;
-      }
-
-      #appSidebar.sidebar {
-        position: fixed !important;
-        top: 0;
-        left: 0;
-        bottom: 0;
-        width: 275px !important;
-        max-width: 82vw;
-        height: 100vh !important;
-        z-index: 1000;
-        transform: translateX(-105%);
-        transition: transform 0.28s ease;
-        overflow-y: auto;
-        background: rgba(248, 250, 252, 0.97) !important;
-        box-shadow: 10px 0 30px rgba(15, 23, 42, 0.16);
-      }
-
-      #appSidebar.sidebar.is-mobile-open {
-        transform: translateX(0);
-      }
-
-      .mobile-backdrop {
-        position: fixed;
-        inset: 0;
-        background: rgba(15, 23, 42, 0.45);
-        backdrop-filter: blur(2px);
-        z-index: 999;
-      }
-    }
-  </style>
+  <link rel="stylesheet" href="css/daylight.css?v=6">
+  <link rel="stylesheet" href="css/sections.css?v=6">
 </head>
 
 <body>
@@ -192,13 +104,13 @@
             </h1>
 
             <span id="heroDate" style="font-size: 18px; font-weight: 600; color: var(--ink); opacity: 0.85; white-space: nowrap; margin-top: -2px; margin-right: 18px;">
-              Tue, November 17, 2026
+              Wed, November 25, 2026
             </span>
           </div>
 
           <p id="heroSubtitle" class="muted" style="margin-top: 6px;">A little focus. A little teamwork. A great day ahead.</p>
 
-          <!-- MOBILE CHECK-IN BAR (Visible only <= 900px) -->
+          <!-- MOBILE CHECK-IN BAR (Visible only <= 860px) -->
           <div class="mobile-checkin-card">
             <div>
               <div id="mobileShiftStatus" style="font-size:0.75rem; font-weight:600; opacity:0.75;">Not checked in</div>
@@ -239,6 +151,21 @@
             <div><b id="statQueries">0</b><button class="btn btn-ghost" onclick="switchSection('queries')">View all</button></div>
             <small>Awaiting response</small>
           </article>
+        </section>
+
+        <!-- Live Team Status & Activity Card -->
+        <section class="card glass">
+          <div class="card-head">
+            <div>
+              <h2>Live team status &amp; activity</h2>
+              <small class="muted">Real-time check-in, WFH, leave, and active task status across your workspace.</small>
+            </div>
+            <span id="dashboardLiveSummaryChip" class="chip push">Syncing...</span>
+            <button class="link" onclick="switchSection('organization')">Full org view ↗</button>
+          </div>
+          <div id="dashboardLiveTeamFeed" class="live-pulse-grid">
+            <p class="text-xs muted">Loading live teammate statuses...</p>
+          </div>
         </section>
 
         <!-- Analytics Chart + Team Conversations -->
@@ -342,7 +269,11 @@
         <label>Priority
           <select id="taskPriority"><option>LOW</option><option selected>MEDIUM</option><option>HIGH</option><option>CRITICAL</option></select>
         </label>
-        <label>Assign to (user ID) <input id="taskAssigneeId" type="number" required placeholder="e.g. 2"></label>
+        <label>Assign to teammate
+          <select id="taskAssigneeId" required>
+            <option value="">Loading teammates...</option>
+          </select>
+        </label>
       </div>
       <label>Due date <input id="taskDueDate" type="datetime-local" required></label>
       <div class="form-actions">
@@ -353,27 +284,27 @@
   </div>
 </div>
 
-<!-- SCRIPTS -->
-<script src="js/api.js"></script>
-<script src="js/attendance_ui.js?v=3"></script>
-<script src="js/admin_ui.js"></script>
-<script src="js/profile_ui.js"></script>
-<script src="js/settings_ui.js"></script>
-<script src="js/tasks_ui.js"></script>
+<!-- SCRIPTS (Core + Shared Presence loaded first) -->
+<script src="js/api.js?v=6"></script>
+<script src="js/ui_kit.js?v=6"></script>
 
-<script src="js/ui_kit.js"></script>
-<script src="js/performance_ui.js"></script>
-<script src="js/calendar_ui.js"></script>
-<script src="js/events_ui.js"></script>
-<script src="js/chats_ui.js?v=5"></script>
-<script src="js/queries_ui.js"></script>
-<script src="js/organization_ui.js"></script>
+<script src="js/attendance_ui.js?v=6"></script>
+<script src="js/admin_ui.js?v=6"></script>
+<script src="js/profile_ui.js?v=6"></script>
+<script src="js/settings_ui.js?v=6"></script>
+<script src="js/tasks_ui.js?v=6"></script>
+<script src="js/performance_ui.js?v=6"></script>
+<script src="js/calendar_ui.js?v=6"></script>
+<script src="js/events_ui.js?v=6"></script>
+<script src="js/chats_ui.js?v=6"></script>
+<script src="js/queries_ui.js?v=6"></script>
+<script src="js/organization_ui.js?v=6"></script>
 
-<script src="js/dashboard.js"></script>
+<script src="js/dashboard.js?v=6"></script>
 
-<script src="js/theme.js"></script>
-<script src="js/sky.js"></script>
-<script src="js/chart.js"></script>
-<script src="js/daylight-init.js"></script>
+<script src="js/theme.js?v=6"></script>
+<script src="js/sky.js?v=6"></script>
+<script src="js/chart.js?v=6"></script>
+<script src="js/daylight-init.js?v=6"></script>
 </body>
 </html>

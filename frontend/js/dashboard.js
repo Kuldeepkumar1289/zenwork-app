@@ -587,9 +587,66 @@ function drawMiniCalendar() {
     container.innerHTML = html;
 }
 
-function openTaskModal() {
-    document.getElementById("taskModal").classList.remove("hidden");
+async function renderDashboardLiveTeamPulse() {
+    const feedEl = document.getElementById("dashboardLiveTeamFeed");
+    const chipEl = document.getElementById("dashboardLiveSummaryChip");
+    if (!feedEl || !window.LivePresence) return;
+
+    const { usersById } = await window.LivePresence.refresh(true);
+    const people = Object.values(usersById);
+
+    const checkedIn = people.filter(p => window.LivePresence.getStatus(p.id).state === "CHECKED_IN").length;
+    const wfhOrLeave = people.filter(p => ["WFH", "ON_LEAVE"].includes(window.LivePresence.getStatus(p.id).state)).length;
+    if (chipEl) {
+        chipEl.textContent = `${checkedIn} Checked in • ${wfhOrLeave} WFH/Leave`;
+    }
+
+    if (!people.length) {
+        feedEl.innerHTML = `<p class="text-xs muted">No teammates in workspace yet.</p>`;
+        return;
+    }
+
+    feedEl.innerHTML = people.map(p => {
+        const activeTasks = (Array.isArray(allTasks) ? allTasks : []).filter(
+            t => t.assigned_to_id === p.id && t.status !== "COMPLETED"
+        );
+        const topTask = activeTasks[0];
+        const activityText = topTask
+            ? `${topTask.status === "BLOCKED" ? "Blocked:" : topTask.status === "PENDING_REVIEW" ? "Review:" : "Working on:"} ${topTask.title}`
+            : (p.designation || p.role_tier);
+
+        return `
+            <div class="live-member-card">
+                <span class="avatar sm">${typeof initials === "function" ? initials(p.full_name) : p.full_name[0]}</span>
+                <div class="flex-1 min-w-0">
+                    <b>${typeof esc === "function" ? esc(p.full_name) : p.full_name} <span class="font-mono text-[11px] opacity-70">[${window.LivePresence.formatId(p)}]</span></b>
+                    <small class="truncate">${typeof esc === "function" ? esc(activityText) : activityText}</small>
+                    <div class="mt-1">${window.LivePresence.badgeHtml(p.id, true)}</div>
+                </div>
+            </div>
+        `;
+    }).join("");
 }
+
+async function openTaskModal() {
+    const modal = document.getElementById("taskModal");
+    if (modal) modal.classList.remove("hidden");
+
+    const selectEl = document.getElementById("taskAssigneeId");
+    if (selectEl && window.LivePresence) {
+        const { usersById } = await window.LivePresence.refresh();
+        const people = Object.values(usersById);
+        selectEl.innerHTML = `<option value="">Select teammate...</option>` + people.map(u => {
+            const st = window.LivePresence.getStatus(u.id).label;
+            return `<option value="${u.id}">${window.LivePresence.formatNameWithId(u)} • ${u.role_tier} (${st})</option>`;
+        }).join("");
+    }
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    setTimeout(renderDashboardLiveTeamPulse, 900);
+});
+
 
 function closeTaskModal() {
     document.getElementById("taskModal").classList.add("hidden");

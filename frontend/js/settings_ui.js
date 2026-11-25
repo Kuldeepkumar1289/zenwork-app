@@ -289,7 +289,7 @@ async function renderSettingsSection() {
         btn.textContent = "Updating...";
 
         try {
-            await apiRequest("/users/me/password", "PATCH", {
+            await apiRequest("/users/change-password", "POST", {
                 current_password: currentPassword,
                 new_password: newPassword
             });
@@ -312,10 +312,11 @@ function resetWorkspacePrefs() {
 }
 
 function copySupportDiagnostics() {
+    const empIdLabel = currentUser?.employee_code || `#ZW-00${currentUser?.id || "?"}`;
     const info = [
         `Workspace: ${currentUser?.company_name || "N/A"} (${currentUser?.company_code || "N/A"})`,
         `User: ${currentUser?.full_name || "N/A"} <${currentUser?.email || "N/A"}>`,
-        `Role: ${currentUser?.role_tier || "N/A"} | ID: #ZW-00${currentUser?.id || "?"}`,
+        `Role: ${currentUser?.role_tier || "N/A"} | ID: ${empIdLabel}`,
         `Timestamp: ${new Date().toISOString()}`
     ].join(" | ");
 

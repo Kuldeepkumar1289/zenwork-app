@@ -14,7 +14,11 @@ async function renderProfileSection() {
     }
     if (!currentUser) return;
 
-    const initials = currentUser.full_name
+    if (window.LivePresence) {
+        await window.LivePresence.refresh();
+    }
+
+    const userInitials = currentUser.full_name
         .split(" ")
         .map(part => part[0])
         .join("")
@@ -22,33 +26,40 @@ async function renderProfileSection() {
         .slice(0, 2);
 
     const avatarSrc = resolveAvatarSrc(currentUser.avatar_url);
+    const displayEmpId = currentUser.employee_code || `#ZW-00${currentUser.id}`;
+    const managerLabel = currentUser.manager_id
+        ? (window.LivePresence ? window.LivePresence.formatNameWithId(currentUser.manager_id) : `User #${currentUser.manager_id}`)
+        : "Top Level";
+    const liveStatusPill = window.LivePresence ? window.LivePresence.badgeHtml(currentUser.id) : "";
 
     container.innerHTML = `
         <div class="flex items-center justify-between flex-wrap gap-3">
             <div>
-                <p class="text-[10px] font-semibold uppercase tracking-wider text-[#1E6B52]">ACCOUNT & PREFERENCES</p>
+                <p class="text-[10px] font-semibold uppercase tracking-wider text-[#1E6B52]">ACCOUNT &amp; PREFERENCES</p>
                 <h1 class="text-2xl font-semibold text-gray-900 mt-0.5">Your space in the workspace.</h1>
                 <p class="text-xs text-gray-500 mt-0.5">Manage your profile picture, personal details, and workspace security.</p>
             </div>
         </div>
 
         <div class="grid grid-cols-12 gap-4 sm:gap-5 items-start mt-4">
-            
             <!-- LEFT: Profile Picture + Personal Details -->
             <div class="col-span-12 lg:col-span-8 bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-6 space-y-5">
                 <div class="flex items-center justify-between flex-wrap gap-4 pb-5 border-b border-[#F0F4F2]">
                     <div class="flex items-center gap-3.5 sm:gap-4 min-w-0">
                         <div id="profileAvatarPreview" class="w-16 h-16 rounded-2xl bg-[#1E6B52] text-white flex items-center justify-center text-lg font-bold shrink-0 overflow-hidden border border-[#E6ECE8]">
                             ${avatarSrc
-                                ? `<img src="${avatarSrc}" alt="" onerror="this.parentElement.textContent='${initials}'" class="w-full h-full object-cover">`
-                                : initials}
+                                ? `<img src="${avatarSrc}" alt="" onerror="this.parentElement.textContent='${userInitials}'" class="w-full h-full object-cover">`
+                                : userInitials}
                         </div>
                         <div class="min-w-0">
-                            <h2 class="text-base font-semibold text-gray-900 truncate">${currentUser.full_name}</h2>
-                            <p class="text-xs text-gray-500 truncate">${currentUser.designation} • ${currentUser.email}</p>
-                            <span class="inline-block mt-1.5 px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-[#E6F4EA] text-[#1E6B52]">
-                                ${currentUser.role_tier} TIER
-                            </span>
+                            <h2 class="text-base font-semibold text-gray-900 truncate">${esc(currentUser.full_name)}</h2>
+                            <p class="text-xs text-gray-500 truncate">${esc(currentUser.designation)} • ${esc(currentUser.email)}</p>
+                            <div class="flex items-center gap-2 flex-wrap mt-1.5">
+                                <span class="inline-block px-2.5 py-0.5 rounded-md text-[10px] font-semibold bg-[#E6F4EA] text-[#1E6B52]">
+                                    ${esc(currentUser.role_tier)} TIER
+                                </span>
+                                ${liveStatusPill}
+                            </div>
                         </div>
                     </div>
 
@@ -71,12 +82,12 @@ async function renderProfileSection() {
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Full Name</label>
-                            <input type="text" id="profFullName" value="${currentUser.full_name}" required
+                            <input type="text" id="profFullName" value="${esc(currentUser.full_name)}" required
                                 class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-[#1E6B52]">
                         </div>
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Designation</label>
-                            <input type="text" id="profDesignation" value="${currentUser.designation}" required
+                            <input type="text" id="profDesignation" value="${esc(currentUser.designation)}" required
                                 class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 focus:outline-none focus:border-[#1E6B52]">
                         </div>
                     </div>
@@ -84,12 +95,12 @@ async function renderProfileSection() {
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Work Email (Read-only)</label>
-                            <input type="email" value="${currentUser.email}" disabled
+                            <input type="email" value="${esc(currentUser.email)}" disabled
                                 class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#F6F8F7] text-gray-500 cursor-not-allowed">
                         </div>
                         <div>
                             <label class="block font-medium text-gray-700 mb-1">Organization (Locked)</label>
-                            <input type="text" value="${currentUser.company_name || 'Zenwork Studio'}${currentUser.company_code ? ' (' + currentUser.company_code + ')' : ''}" disabled
+                            <input type="text" value="${esc((currentUser.company_name || 'Zenwork Studio') + (currentUser.company_code ? ' (' + currentUser.company_code + ')' : ''))}" disabled
                                 class="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 bg-[#F6F8F7] text-gray-500 cursor-not-allowed">
                         </div>
                     </div>
@@ -98,7 +109,7 @@ async function renderProfileSection() {
                         <h3 class="text-xs font-semibold text-gray-900">Workspace Settings</h3>
                         <label class="flex items-center justify-between gap-3 p-3 rounded-xl bg-[#F6F8F7] border border-[#E6ECE8] cursor-pointer">
                             <div>
-                                <p class="font-medium text-gray-800">Task & Blocker Alerts</p>
+                                <p class="font-medium text-gray-800">Task &amp; Blocker Alerts</p>
                                 <p class="text-[11px] text-gray-400">Receive instant notifications when tasks are assigned or blocked</p>
                             </div>
                             <input type="checkbox" checked class="w-4 h-4 shrink-0 accent-[#1E6B52]">
@@ -126,31 +137,30 @@ async function renderProfileSection() {
                     <h3 class="text-sm font-semibold text-gray-900">Account Information</h3>
                     <div class="flex justify-between py-1.5 border-b border-[#F6F8F7]">
                         <span class="text-gray-400">Employee ID</span>
-                        <span class="font-mono font-semibold text-gray-800">#ZW-00${currentUser.id}</span>
+                        <span class="font-mono font-semibold text-gray-800">${esc(displayEmpId)}</span>
                     </div>
                     <div class="flex justify-between py-1.5 border-b border-[#F6F8F7]">
                         <span class="text-gray-400">Organization</span>
-                        <span class="font-medium text-gray-800">${currentUser.company_name || "Zenwork Studio"}</span>
+                        <span class="font-medium text-gray-800">${esc(currentUser.company_name || "Zenwork Studio")}</span>
                     </div>
                     <div class="flex justify-between py-1.5 border-b border-[#F6F8F7]">
                         <span class="text-gray-400">Access Level</span>
-                        <span class="font-semibold text-[#1E6B52]">${currentUser.role_tier}</span>
+                        <span class="font-semibold text-[#1E6B52]">${esc(currentUser.role_tier)}</span>
                     </div>
                     <div class="flex justify-between py-1.5">
                         <span class="text-gray-400">Reporting Manager</span>
-                        <span class="font-medium text-gray-800">${currentUser.manager_id ? "User #" + currentUser.manager_id : "Top Level"}</span>
+                        <span class="font-medium text-gray-800">${esc(managerLabel)}</span>
                     </div>
                 </div>
 
                 <div class="bg-white rounded-2xl border border-[#E6ECE8] p-4 sm:p-5 space-y-3 text-xs">
-                    <h3 class="text-sm font-semibold text-gray-900">Security & Session</h3>
+                    <h3 class="text-sm font-semibold text-gray-900">Security &amp; Session</h3>
                     <p class="text-[11px] text-gray-500">Signed in with JWT Bearer authentication. Sign out from all devices if using a shared system.</p>
                     <button onclick="logout()" class="w-full py-2.5 px-4 rounded-xl border border-red-200 text-red-600 font-semibold hover:bg-red-50 transition cursor-pointer">
                         Sign out of workspace
                     </button>
                 </div>
             </div>
-
         </div>
     `;
 

@@ -1,16 +1,34 @@
-let orgViewMode = "tree"; // "tree" (Reporting Hierarchy) | "roles" (By Role Tier)
+let orgViewMode = "tree";
 let cachedOrgRoots = [];
 let cachedLiveStatus = {};
+
+function formatOrgMemberId(person) {
+  if (person && person.employee_code) return String(person.employee_code);
+  return `#${person?.id ?? ""}`;
+}
+
+function getMemberCurrentActivity(userId) {
+  const tasks = Array.isArray(allTasks) ? allTasks.filter(t => t.assigned_to_id === userId && t.status !== "COMPLETED") : [];
+  if (!tasks.length) return "";
+  const priorityOrder = { BLOCKED: 1, IN_PROGRESS: 2, PENDING_REVIEW: 3, TODO: 4 };
+  tasks.sort((a, b) => (priorityOrder[a.status] || 9) - (priorityOrder[b.status] || 9));
+  const top = tasks[0];
+  const prefix = top.status === "BLOCKED" ? "Blocked on"
+               : top.status === "PENDING_REVIEW" ? "In review"
+               : top.status === "IN_PROGRESS" ? "Working on"
+               : "Next up";
+  return `${prefix}: ${top.title}`;
+}
 
 async function renderOrganizationSection() {
   const [tree, liveStatuses] = await Promise.all([
     fetchOr(API.orgTree, []),
-    fetchOr("/attendance/team/live-status", {})
+    fetchOr("/attendance/team/live-status", {}),
+    typeof loadTasks === "function" ? loadTasks() : Promise.resolve()
   ]);
   cachedOrgRoots = Array.isArray(tree) ? tree : [];
   cachedLiveStatus = liveStatuses || {};
 
-  // Sync current logged-in user's live shift status immediately
   if (typeof currentUser !== "undefined" && currentUser && typeof todayAttendance !== "undefined" && todayAttendance) {
     const uid = String(currentUser.id);
     if (todayAttendance.punch_in && !todayAttendance.punch_out) {
@@ -72,6 +90,23 @@ function renderStatusBadge(userId) {
   `;
 }
 
+function getRoleBadgeStyle(roleTier) {
+  switch (roleTier) {
+    case "ADMIN":
+      return "background: var(--accent); color: var(--accent-ink);";
+    case "HR":
+      return "background: rgba(14, 116, 144, 0.14); color: #0e7490;";
+    case "MANAGER":
+      return "background: rgba(29, 107, 82, 0.14); color: var(--accent);";
+    case "TEAM_LEAD":
+      return "background: rgba(217, 119, 6, 0.14); color: #b45309;";
+    case "INTERN":
+      return "background: rgba(109, 40, 217, 0.12); color: #6d28d9;";
+    default:
+      return "";
+  }
+}
+
 function drawOrganization() {
   const roots = cachedOrgRoots;
   const people = flattenOrgTree(roots);
@@ -80,14 +115,15 @@ function drawOrganization() {
   const getSt = (id) => cachedLiveStatus[id] || cachedLiveStatus[String(id)] || { state: "NOT_CHECKED_IN" };
   const checkedInCount = people.filter(p => getSt(p.id).state === "CHECKED_IN").length;
   const wfhOrLeaveCount = people.filter(p => ["WFH", "ON_LEAVE"].includes(getSt(p.id).state)).length;
-  
-  // Build parent lookup map so every person shows their exact reporting line
+  const approverLeadsCount = countRole("MANAGER") + countRole("TEAM_LEAD") + countRole("HR");
+
   const managerOf = {};
-  const mapReports = (nodes, managerName = "Top-Level Leadership") => {
+  const mapReports = (nodes, managerLabel = "Workspace Leadership") => {
     for (const n of nodes || []) {
-      managerOf[n.id] = managerName;
+      managerOf[n.id] = managerLabel;
+      const label = `${n.full_name} (${formatOrgMemberId(n)})`;
       if (Array.isArray(n.subordinates) && n.subordinates.length) {
-        mapReports(n.subordinates, n.full_name);
+        mapReports(n.subordinates, label);
       }
     }
   };
@@ -98,11 +134,11 @@ function drawOrganization() {
     : emptyState("No organization members found in this workspace yet.");
 
   const roleGroups = [
-    { tier: "ADMIN",     title: "Workspace Admins",     desc: "Workspace management, events, holidays, onboarding & role setup" },
+    { tier: "ADMIN",     title: "Workspace Admins",     desc: "Workspace setup, onboarding, roles, events & holidays" },
     { tier: "HR",        title: "Human Resources (HR)", desc: "People operations, leave/WFH governance & employee support" },
-    { tier: "MANAGER",   title: "Team Managers",        desc: "Leave/WFH approvals, team escalations & performance review" },
+    { tier: "MANAGER",   title: "Team Managers",        desc: "Leave/WFH approvals, task/report review & escalations" },
     { tier: "TEAM_LEAD", title: "Team Leads (TL)",      desc: "Task assignment, completion verification & work report sign-off" },
-    { tier: "MEMBER",    title: "Team Members",         desc: "Core task execution, reporting, attendance & leave requests" },
+    { tier: "MEMBER",    title: "Team Members",         desc: "Core task execution, work reports, attendance & leave requests" },
     { tier: "INTERN",    title: "Interns",              desc: "Guided deliverables, progress reports & shift tracking" }
   ];
 
@@ -112,44 +148,58 @@ function drawOrganization() {
       <div class="mb-6 last:mb-0">
         <div class="flex items-center justify-between pb-2 mb-3 border-b border-[var(--line)]">
           <div>
-            <h3 class="text-sm font-bold text-gray-900">${group.title}</h3>
-            <p class="text-xs muted">${group.desc}</p>
+            <h3 class="text-sm font-bold text-gray-900">${esc(group.title)}</h3>
+            <p class="text-xs muted">${esc(group.desc)}</p>
           </div>
           <span class="chip">${members.length} ${members.length === 1 ? "person" : "people"}</span>
         </div>
         ${members.length ? members.map(p => {
-          const directReports = (p.subordinates || []).map(s => s.full_name).join(", ");
+          const directReports = (p.subordinates || [])
+            .map(s => `${s.full_name} (${formatOrgMemberId(s)})`)
+            .join(", ");
+          const activeTask = getMemberCurrentActivity(p.id);
           return `
-            <div class="org-card flex-wrap gap-2" data-name="${esc(p.full_name.toLowerCase())}">
+            <div class="org-card flex-wrap gap-2" data-name="${esc((p.full_name + " " + formatOrgMemberId(p) + " " + p.role_tier).toLowerCase())}">
               <span class="avatar">${initials(p.full_name)}</span>
               <div class="flex-1 min-w-0">
-                <b>${esc(p.full_name)}</b>
-                <small>${esc(p.designation || "Member")} • ${esc(p.email || "")}</small>                <small class="block mt-0.5 text-[11px]">
-                  Team / Reports to: <b>${esc(managerOf[p.id] || "Top-Level")}</b>
-                  ${directReports ? ` &nbsp;|&nbsp; Manages: <b>${esc(directReports)}</b>` : ""}
+                <b>${esc(p.full_name)} <span class="text-xs font-mono opacity-75">[${esc(formatOrgMemberId(p))}]</span></b>
+                <small>${esc(p.designation || "Member")} • ${esc(p.email || "")}</small>
+                <small class="block mt-0.5 text-[11px]">
+                  Reports to: <b>${esc(managerOf[p.id] || "Workspace Leadership")}</b>
+                  ${directReports ? ` &nbsp;|&nbsp; Supervises: <b>${esc(directReports)}</b>` : ""}
                 </small>
+                ${activeTask ? `<small class="block mt-0.5 text-[11px]" style="color:var(--accent);font-weight:600;">${esc(activeTask)}</small>` : ""}
               </div>
               <div class="flex items-center gap-2 flex-wrap">
                 ${renderStatusBadge(p.id)}
-                <span class="chip">${esc(p.role_tier)}</span>
+                <span class="chip" style="${getRoleBadgeStyle(p.role_tier)}">${esc(p.role_tier)}</span>
               </div>
             </div>`;
         }).join("") : emptyState(`No users in ${group.tier} role yet.`)}
       </div>`;
   }).join("");
 
+  const roleBreakdownSub = [
+    `${countRole("ADMIN")} Admin`,
+    `${countRole("HR")} HR`,
+    `${countRole("MANAGER")} Mgr`,
+    `${countRole("TEAM_LEAD")} TL`,
+    `${countRole("MEMBER")} Member`,
+    `${countRole("INTERN")} Intern`
+  ].join(" • ");
+
   setSection(`
-    ${pageHead("Organization & Live Team Status", "Reporting hierarchy, team structure, and real-time check-in/WFH/leave availability.",
+    ${pageHead("Organization & Live Team Status", "Reporting hierarchy, live shift status, and what each teammate is currently working on.",
       `<div class="flex items-center gap-2.5 flex-wrap">
         ${segmented([["tree", "Reporting Tree"], ["roles", "Role Structure"]], orgViewMode, "setOrgViewMode")}
-        <input id="orgSearch" class="search-box" placeholder="Find a teammate…" oninput="filterOrg(this.value)">
+        <input id="orgSearch" class="search-box" placeholder="Find by name or ID…" oninput="filterOrg(this.value)">
       </div>`)}
 
     <div class="kpis">
-      ${kpi("Total Members", people.length, `${countRole("ADMIN")} Admin • ${countRole("MANAGER")} Mgr • ${countRole("MEMBER")} Member`)}
+      ${kpi("Total Members", people.length, roleBreakdownSub)}
       ${kpi("Checked In Now", checkedInCount, "Active in workspace today")}
       ${kpi("WFH / On Leave", wfhOrLeaveCount, "Remote or approved time off")}
-      ${kpi("Managers & Leads", countRole("MANAGER") + countRole("ADMIN"), "Team approvers")}
+      ${kpi("Leads & Reviewers", approverLeadsCount, "Managers, TLs & HR")}
     </div>
 
     <section class="card glass" id="orgTree">
@@ -160,21 +210,21 @@ function drawOrganization() {
 
 function renderOrgBranch(person, depth = 0, managerOf = {}) {
   const reports = person.subordinates || [];
-  const roleBadgeStyle =
-    person.role_tier === "ADMIN"   ? "background: var(--accent); color: var(--accent-ink);" :
-    person.role_tier === "MANAGER" ? "background: rgba(29, 107, 82, 0.14); color: var(--accent);" : "";
+  const roleBadgeStyle = getRoleBadgeStyle(person.role_tier);
+  const activeTask = getMemberCurrentActivity(person.id);
 
   const teamLeadLine = depth > 0
-    ? `<small class="block text-[11px] mt-0.5">Team: <b>${esc(managerOf[person.id] || "Leadership")}</b></small>`
+    ? `<small class="block text-[11px] mt-0.5">Reports to: <b>${esc(managerOf[person.id] || "Leadership")}</b></small>`
     : `<small class="block text-[11px] mt-0.5">Workspace Leadership</small>`;
 
   const card = `
-    <div class="org-card flex-wrap gap-2" data-name="${esc(person.full_name.toLowerCase())}">
+    <div class="org-card flex-wrap gap-2" data-name="${esc((person.full_name + " " + formatOrgMemberId(person) + " " + person.role_tier).toLowerCase())}">
       <span class="avatar">${initials(person.full_name)}</span>
       <div class="flex-1 min-w-0">
-        <b>${esc(person.full_name)}</b>
+        <b>${esc(person.full_name)} <span class="text-xs font-mono opacity-75">[${esc(formatOrgMemberId(person))}]</span></b>
         <small>${esc(person.designation || "Team Member")} • ${esc(person.email || "")}</small>
         ${teamLeadLine}
+        ${activeTask ? `<small class="block text-[11px] mt-0.5" style="color:var(--accent);font-weight:600;">${esc(activeTask)}</small>` : ""}
       </div>
       <div class="flex items-center gap-2 flex-wrap">
         ${renderStatusBadge(person.id)}

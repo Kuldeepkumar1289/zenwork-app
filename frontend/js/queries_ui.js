@@ -1,11 +1,11 @@
-/* queries_ui.js — Inter-Department Queries (Matched to QueryCreate & QueryResolve)
-    */
-
 let queriesList = [];
 let queryFilter = "OPEN";
 
 async function renderQueriesSection() {
-  const data = await fetchOr(API.queries, []);
+  const [data] = await Promise.all([
+    fetchOr(API.queries, []),
+    window.LivePresence ? window.LivePresence.refresh() : Promise.resolve()
+  ]);
   queriesList = Array.isArray(data) ? data : [];
   drawQueries();
 }
@@ -48,7 +48,7 @@ async function submitQuery(event) {
 
 async function resolveQuery(id) {
   const input = prompt("Enter resolution notes for this query:", "Checked and resolved.");
-  if (input === null) return; // User cancelled prompt
+  if (input === null) return;
 
   const payload = {
     resolution_notes: input.trim() || "Resolved by team lead.",
@@ -56,7 +56,6 @@ async function resolveQuery(id) {
   };
 
   try {
-    // Supports both PATCH /queries/{id}/resolve and PATCH /queries/{id}
     try {
       await apiRequest(`${API.queries}${id}/resolve`, "PATCH", payload);
     } catch (routeErr) {
@@ -70,7 +69,7 @@ async function resolveQuery(id) {
 }
 
 function drawQueries() {
-  const canResolve = ["ADMIN", "MANAGER"].includes(currentUser?.role_tier);
+  const canResolve = ["ADMIN", "HR", "MANAGER", "TEAM_LEAD"].includes(currentUser?.role_tier);
   const openCount = queriesList.filter(q => q.status === "OPEN" || q.status === "IN_REVIEW").length;
   const resolvedCount = queriesList.filter(q => q.status === "RESOLVED").length;
 
@@ -87,23 +86,34 @@ function drawQueries() {
     LOW:    "opacity:0.75;"
   };
 
-  const items = shown.map(q => `
-    <article class="q-item">
-      <div>
-        <div class="flex items-center gap-2 flex-wrap">
-          <b>${esc(q.title)}</b>
-          <span class="chip" style="font-size:10px;padding:2px 8px;">${esc(q.target_department || "General")}</span>
-          <span class="chip" style="font-size:10px;padding:2px 8px;${priorityColors[q.priority] || ""}">${esc(q.priority || "MEDIUM")}</span>
+  const items = shown.map(q => {
+    const raiserId = q.raised_by_id || q.user_id || q.created_by_id;
+    const raiserTag = raiserId && window.LivePresence
+      ? ` • Raised by ${window.LivePresence.formatNameWithId(q.raiser || raiserId)}`
+      : "";
+    const livePill = raiserId && window.LivePresence
+      ? window.LivePresence.badgeHtml(raiserId, true)
+      : "";
+
+    return `
+      <article class="q-item">
+        <div>
+          <div class="flex items-center gap-2 flex-wrap">
+            <b>${esc(q.title)}</b>
+            <span class="chip" style="font-size:10px;padding:2px 8px;">${esc(q.target_department || "General")}</span>
+            <span class="chip" style="font-size:10px;padding:2px 8px;${priorityColors[q.priority] || ""}">${esc(q.priority || "MEDIUM")}</span>
+            ${livePill}
+          </div>
+          <p class="muted">${esc(q.description)}</p>
+          ${q.resolution_notes ? `<p class="text-xs mt-1" style="color:var(--accent);"><b>Resolution:</b> ${esc(q.resolution_notes)}</p>` : ""}
+          <small>${fmtDate(q.created_at)} • Query #${esc(q.id)}${esc(raiserTag)}${q.task_id ? ` • Task #${esc(q.task_id)}` : ""}</small>
         </div>
-        <p class="muted">${esc(q.description)}</p>
-        ${q.resolution_notes ? `<p class="text-xs mt-1" style="color:var(--accent);"><b>Resolution:</b> ${esc(q.resolution_notes)}</p>` : ""}
-        <small>${fmtDate(q.created_at)} • Query #${esc(q.id)}${q.task_id ? ` • Task #${esc(q.task_id)}` : ""}</small>
-      </div>
-      <span class="chip">${esc(q.status || "OPEN")}</span>
-      ${canResolve && (q.status === "OPEN" || q.status === "IN_REVIEW")
-        ? `<button class="btn btn-ghost" onclick="resolveQuery(${q.id})">Resolve</button>`
-        : ""}
-    </article>`).join("");
+        <span class="chip">${esc(q.status || "OPEN")}</span>
+        ${canResolve && (q.status === "OPEN" || q.status === "IN_REVIEW")
+          ? `<button class="btn btn-ghost" onclick="resolveQuery(${q.id})">Resolve</button>`
+          : ""}
+      </article>`;
+  }).join("");
 
   setSection(`
     ${pageHead("Queries", "Ask once, get clarity. Raise a question for Admin, HR, IT or Engineering.")}

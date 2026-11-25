@@ -1,35 +1,37 @@
 from typing import List
-from fastapi import APIRouter, Depends, status, WebSocket, WebSocketDisconnect, Query
+from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from src.utils.db import get_db, SessionLocal
-from src.utils.dependencies import get_current_user
-from src.utils.security import decode_access_token
-from src.user.models import User
-from src.tasks.controller import get_subordinate_ids
-from src.communications.models import NoticeScope
-from src.communications.dtos import (
-    CommunicationCreate,
-    CommunicationResponse,
-    SendChatInviteRequest,
-    RespondChatInviteRequest,
-    ChatRequestResponse,
-    SendMessageRequest,
-    DirectMessageResponse
-)
 from src.communications.controller import (
     create_notice,
-    get_visible_notices,
-    send_chat_invite,
-    respond_to_chat_invite,
+    get_conversation_history,
     get_pending_chat_invites,
-    send_direct_message,
-    get_conversation_history
+    get_visible_notices,
+    respond_to_chat_invite,
+    send_chat_invite,
+    send_direct_message
 )
+from src.communications.dtos import (
+    ChatRequestResponse,
+    CommunicationCreate,
+    CommunicationResponse,
+    DirectMessageResponse,
+    RespondChatInviteRequest,
+    SendChatInviteRequest,
+    SendMessageRequest
+)
+from src.communications.models import NoticeScope
 from src.communications.websocket_manager import ws_manager
+from src.tasks.controller import get_subordinate_ids
+from src.user.models import User
+from src.utils.db import SessionLocal, get_db
+from src.utils.dependencies import get_current_user
+from src.utils.security import decode_access_token
 
 comm_router = APIRouter(prefix="/communications", tags=["Communications & Direct Chat"])
 communication_router = comm_router
+
 
 # --- Notice Board Endpoints ---
 @comm_router.post("", response_model=CommunicationResponse, status_code=status.HTTP_201_CREATED)
@@ -50,11 +52,18 @@ async def post_notice(
         "created_at": str(notice.created_at)
     }
     if notice.scope == NoticeScope.ALL:
-        await ws_manager.broadcast_all(payload)
+        clean_company = (current_user.company_name or "").strip().lower()
+        company_user_ids = [
+            u.id for u in db.query(User.id).filter(
+                func.lower(func.trim(User.company_name)) == clean_company
+            ).all()
+        ]
+        await ws_manager.broadcast_to_users(payload, company_user_ids)
     else:
         subordinate_ids = get_subordinate_ids(current_user)
         await ws_manager.broadcast_to_users(payload, subordinate_ids)
     return notice
+
 
 @comm_router.get("", response_model=List[CommunicationResponse])
 @comm_router.get("/", response_model=List[CommunicationResponse], include_in_schema=False)
@@ -63,6 +72,7 @@ def list_notices(
     db: Session = Depends(get_db)
 ):
     return get_visible_notices(current_user=current_user, db=db)
+
 
 # --- Member-to-Member Chat Request & Direct Messaging Endpoints ---
 @comm_router.post("/chat/invite", response_model=ChatRequestResponse, status_code=status.HTTP_201_CREATED)
@@ -73,12 +83,14 @@ def invite_member(
 ):
     return send_chat_invite(data=data, current_user=current_user, db=db)
 
+
 @comm_router.get("/chat/invites/pending", response_model=List[ChatRequestResponse])
 def list_pending_invites(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
     return get_pending_chat_invites(current_user=current_user, db=db)
+
 
 @comm_router.patch("/chat/invites/{request_id}/respond", response_model=ChatRequestResponse)
 def respond_invite(
@@ -89,6 +101,7 @@ def respond_invite(
 ):
     return respond_to_chat_invite(request_id=request_id, data=data, current_user=current_user, db=db)
 
+
 @comm_router.post("/chat/messages", response_model=DirectMessageResponse)
 def post_message(
     data: SendMessageRequest,
@@ -97,6 +110,7 @@ def post_message(
 ):
     return send_direct_message(data=data, current_user=current_user, db=db)
 
+
 @comm_router.get("/chat/messages/{partner_id}", response_model=List[DirectMessageResponse])
 def get_chat(
     partner_id: int,
@@ -104,6 +118,7 @@ def get_chat(
     db: Session = Depends(get_db)
 ):
     return get_conversation_history(partner_id=partner_id, current_user=current_user, db=db)
+
 
 # --- WebSocket Endpoint ---
 @comm_router.websocket("/ws")

@@ -1,6 +1,6 @@
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class EventCreate(BaseModel):
@@ -19,13 +19,14 @@ class RSVPRequest(BaseModel):
 class EventOut(BaseModel):
     id: int
     title: str
-    description: Optional[str]
-    location: Optional[str]
+    description: Optional[str] = None
+    location: Optional[str] = None
     event_type: str
     starts_at: datetime
-    ends_at: Optional[datetime]
+    ends_at: Optional[datetime] = None
+    created_by_id: Optional[int] = None
+    organizer_name: Optional[str] = None
     going: int
     my_response: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes=True)

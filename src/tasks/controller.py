@@ -1,10 +1,26 @@
-from typing import List
 from datetime import datetime, timezone
-from sqlalchemy.orm import Session
+from typing import List
 from fastapi import HTTPException, status
-from src.tasks.models import Task, TaskStatus, BlockerLog
-from src.tasks.dtos import TaskCreate, TaskUpdateStatus, TaskAnalyticsResponse, ReportBlockerRequest, EscalationItem
-from src.user.models import User, RoleTier
+from sqlalchemy import func
+from sqlalchemy.orm import Session
+
+from src.tasks.dtos import (
+    EscalationItem,
+    ReportBlockerRequest,
+    TaskAnalyticsResponse,
+    TaskCreate,
+    TaskUpdateStatus
+)
+from src.tasks.models import BlockerLog, Task, TaskStatus
+from src.user.models import RoleTier, User
+
+
+def _company_user_ids(user: User, db: Session) -> list[int]:
+    clean_company = (user.company_name or "").strip().lower()
+    rows = db.query(User.id).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).all()
+    return [r.id for r in rows]
 
 
 def get_subordinate_ids(user: User, visited: set[int] | None = None) -> list[int]:
@@ -24,25 +40,29 @@ def get_subordinate_ids(user: User, visited: set[int] | None = None) -> list[int
 
 
 def create_task(data: TaskCreate, current_user: User, db: Session) -> Task:
-    if data.assigned_to_id:
-        if data.assigned_to_id != current_user.id:
-            if current_user.role_tier != RoleTier.ADMIN:
-                subordinate_ids = get_subordinate_ids(current_user)
-                if data.assigned_to_id not in subordinate_ids:
-                    raise HTTPException(
-                        status_code=status.HTTP_403_FORBIDDEN,
-                        detail="You can only delegate tasks to members within your reporting line."
-                    )
+    clean_company = (current_user.company_name or "").strip().lower()
 
-        assignee = db.query(User).filter(User.id == data.assigned_to_id).first()
+    if data.assigned_to_id:
+        assignee = db.query(User).filter(
+            User.id == data.assigned_to_id,
+            func.lower(func.trim(User.company_name)) == clean_company
+        ).first()
         if not assignee:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assigned user not found."
+                detail="Assigned user not found in your organization."
             )
 
+        if data.assigned_to_id != current_user.id and current_user.role_tier != RoleTier.ADMIN:
+            subordinate_ids = get_subordinate_ids(current_user)
+            if data.assigned_to_id not in subordinate_ids:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="You can only delegate tasks to members within your reporting line."
+                )
+
     new_task = Task(
-        title=data.title,
+        title=data.title.strip(),
         description=data.description,
         priority=data.priority,
         due_date=data.due_date,
@@ -58,22 +78,44 @@ def create_task(data: TaskCreate, current_user: User, db: Session) -> Task:
 
 
 def get_user_tasks(current_user: User, db: Session) -> List[Task]:
-    """Admin/Manager can see tasks + delegated tasks. Members/Interns see assigned/created tasks."""
-    if current_user.role_tier == RoleTier.ADMIN:
-        return db.query(Task).all()
+    """Admin/HR see company tasks; Managers/TLs see hierarchy tasks; Members/Interns see own/assigned tasks."""
+    company_ids = _company_user_ids(current_user, db)
+    if not company_ids:
+        return []
+
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
+        return (
+            db.query(Task)
+            .filter(
+                (Task.created_by_id.in_(company_ids)) |
+                (Task.assigned_to_id.in_(company_ids))
+            )
+            .order_by(Task.created_at.desc())
+            .all()
+        )
 
     subordinate_ids = get_subordinate_ids(current_user)
     scope_ids = subordinate_ids + [current_user.id]
 
-    return db.query(Task).filter(
-        (Task.assigned_to_id.in_(scope_ids)) |
-        (Task.created_by_id == current_user.id)
-    ).all()
+    return (
+        db.query(Task)
+        .filter(
+            (Task.assigned_to_id.in_(scope_ids)) |
+            (Task.created_by_id == current_user.id)
+        )
+        .order_by(Task.created_at.desc())
+        .all()
+    )
 
 
 def update_task_status(task_id: int, data: TaskUpdateStatus, current_user: User, db: Session) -> Task:
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
+
+    company_ids = set(_company_user_ids(current_user, db))
+    in_same_company = (task.created_by_id in company_ids) or (task.assigned_to_id in company_ids)
+    if not in_same_company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found.")
 
     subordinate_ids = get_subordinate_ids(current_user)
@@ -92,7 +134,7 @@ def update_task_status(task_id: int, data: TaskUpdateStatus, current_user: User,
     is_reviewer = current_user.role_tier in [RoleTier.TEAM_LEAD, RoleTier.MANAGER]
     is_executor = current_user.role_tier in [RoleTier.MEMBER, RoleTier.INTERN]
 
-    # 1. Final COMPLETED sign-off or review decision -> Team Lead or Manager only
+    # 1. Final COMPLETED sign-off or revision request -> Team Lead or Manager only
     if data.status == TaskStatus.COMPLETED or (
         task.status == TaskStatus.PENDING_REVIEW and data.status == TaskStatus.IN_PROGRESS
     ):
@@ -101,7 +143,9 @@ def update_task_status(task_id: int, data: TaskUpdateStatus, current_user: User,
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Task completion approval and report sign-off can only be done by a Team Lead or Manager."
             )
-        if data.status == TaskStatus.COMPLETED and not (task.completion_report or (data.completion_report and data.completion_report.strip())):
+        if data.status == TaskStatus.COMPLETED and not (
+            task.completion_report or (data.completion_report and data.completion_report.strip())
+        ):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="A completion report must be submitted before marking the task as completed."
@@ -191,8 +235,11 @@ def resolve_blocker(blocker_id: int, current_user: User, db: Session) -> Blocker
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blocker not found")
 
     task = blocker.task
-    subordinate_ids = get_subordinate_ids(current_user)
+    company_ids = set(_company_user_ids(current_user, db))
+    if (task.created_by_id not in company_ids) and (task.assigned_to_id not in company_ids):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Blocker not found")
 
+    subordinate_ids = get_subordinate_ids(current_user)
     if (
         task.assigned_to_id != current_user.id and
         task.created_by_id != current_user.id and
@@ -211,16 +258,32 @@ def resolve_blocker(blocker_id: int, current_user: User, db: Session) -> Blocker
 
 
 def get_escalated_blockers(current_user: User, db: Session) -> List[EscalationItem]:
-    """Managers/Admins ko unke downward hierarchy ke un-resolved blockers dikhata hai."""
-    subordinate_ids = get_subordinate_ids(current_user)
+    """Company-scoped unresolved blockers for Admin/Managers/Team Leads."""
+    company_ids = _company_user_ids(current_user, db)
+    if not company_ids:
+        return []
 
     if current_user.role_tier == RoleTier.ADMIN:
-        unresolved = db.query(BlockerLog).filter(BlockerLog.is_resolved == False).all()
+        unresolved = (
+            db.query(BlockerLog)
+            .join(Task)
+            .filter(
+                BlockerLog.is_resolved == False,
+                Task.assigned_to_id.in_(company_ids)
+            )
+            .all()
+        )
     else:
-        unresolved = db.query(BlockerLog).join(Task).filter(
-            BlockerLog.is_resolved == False,
-            Task.assigned_to_id.in_(subordinate_ids)
-        ).all()
+        subordinate_ids = get_subordinate_ids(current_user)
+        unresolved = (
+            db.query(BlockerLog)
+            .join(Task)
+            .filter(
+                BlockerLog.is_resolved == False,
+                Task.assigned_to_id.in_(subordinate_ids)
+            )
+            .all()
+        )
 
     escalations = []
     for item in unresolved:

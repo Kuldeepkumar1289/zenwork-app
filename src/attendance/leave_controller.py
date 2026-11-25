@@ -1,10 +1,26 @@
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from fastapi import HTTPException, status
+from sqlalchemy import func
 from sqlalchemy.orm import Session
-from src.attendance.models import LeaveRequest, LeaveRequestStatus, LeaveType, Attendance, AttendanceStatus
+
 from src.attendance.dtos import ApplyLeaveRequest, ReviewLeaveRequest
-from src.user.models import User, RoleTier
+from src.attendance.models import (
+    Attendance,
+    AttendanceStatus,
+    LeaveRequest,
+    LeaveRequestStatus,
+    LeaveType
+)
 from src.tasks.controller import get_subordinate_ids
+from src.user.models import RoleTier, User
+
+
+def _company_user_ids(user: User, db: Session) -> list[int]:
+    clean_company = (user.company_name or "").strip().lower()
+    rows = db.query(User.id).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).all()
+    return [r.id for r in rows]
 
 
 def sync_user_quotas(user: User, db: Session):
@@ -53,7 +69,6 @@ def submit_leave_or_wfh(data: ApplyLeaveRequest, current_user: User, db: Session
     days = (data.end_date - data.start_date).days + 1
     sync_user_quotas(current_user, db)
 
-    # Validate balance before creating request (WFH min 0, Leave min -5)
     if data.leave_type == LeaveType.WFH:
         if current_user.wfh_balance - days < 0:
             raise HTTPException(
@@ -88,7 +103,7 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
         raise HTTPException(status_code=404, detail="Leave/WFH request not found.")
 
     applicant = db.query(User).filter(User.id == leave.user_id).first()
-    if not applicant or applicant.company_name != current_user.company_name:
+    if not applicant or (applicant.company_name or "").strip().lower() != (current_user.company_name or "").strip().lower():
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to a different workspace.")
 
     if current_user.role_tier == RoleTier.ADMIN:
@@ -99,9 +114,10 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
 
     is_direct_manager = (
         current_user.role_tier == RoleTier.MANAGER
+        and leave.user_id != current_user.id
         and (applicant.manager_id == current_user.id or leave.user_id in (get_subordinate_ids(current_user) or []))
     )
-    is_hr = current_user.role_tier == RoleTier.HR
+    is_hr = current_user.role_tier == RoleTier.HR and leave.user_id != current_user.id
 
     if not (is_direct_manager or is_hr):
         raise HTTPException(
@@ -109,7 +125,6 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
             detail="Unauthorized: Only the member's reporting Manager or HR can approve/reject Leave & WFH requests."
         )
 
-    # Deduct balance ONLY when Manager/Admin approves (and prevent double deduction)
     if data.status == LeaveRequestStatus.APPROVED and leave.status != LeaveRequestStatus.APPROVED:
         sync_user_quotas(applicant, db)
 
@@ -160,19 +175,20 @@ def review_leave_or_wfh(request_id: int, data: ReviewLeaveRequest, current_user:
 
 
 def list_leave_requests(current_user: User, db: Session):
-    if current_user.role_tier == RoleTier.ADMIN:
-        company_user_ids = [
-            u.id for u in db.query(User.id).filter(User.company_name == current_user.company_name).all()
-        ]
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
+        company_user_ids = _company_user_ids(current_user, db)
+        if not company_user_ids:
+            return []
         return db.query(LeaveRequest).filter(
             LeaveRequest.user_id.in_(company_user_ids)
         ).order_by(LeaveRequest.created_at.desc()).all()
-    elif current_user.role_tier == RoleTier.MANAGER:
+
+    if current_user.role_tier == RoleTier.MANAGER:
         sub_ids = (get_subordinate_ids(current_user) or []) + [current_user.id]
         return db.query(LeaveRequest).filter(
             LeaveRequest.user_id.in_(sub_ids)
         ).order_by(LeaveRequest.created_at.desc()).all()
-    else:
-        return db.query(LeaveRequest).filter(
-            LeaveRequest.user_id == current_user.id
-        ).order_by(LeaveRequest.created_at.desc()).all()
+
+    return db.query(LeaveRequest).filter(
+        LeaveRequest.user_id == current_user.id
+    ).order_by(LeaveRequest.created_at.desc()).all()

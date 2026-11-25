@@ -1,39 +1,49 @@
 from typing import List
 from fastapi import HTTPException, status
+from sqlalchemy import and_, func, or_
 from sqlalchemy.orm import Session
-from sqlalchemy import or_, and_
-from src.user.models import User, RoleTier
-from src.communications.models import (
-    Communication,
-    NoticeScope,
-    ChatRequest,
-    ChatRequestStatus,
-    DirectMessage
-)
+
 from src.communications.dtos import (
     CommunicationCreate,
-    SendChatInviteRequest,
     RespondChatInviteRequest,
+    SendChatInviteRequest,
     SendMessageRequest
 )
+from src.communications.models import (
+    ChatRequest,
+    ChatRequestStatus,
+    Communication,
+    DirectMessage,
+    NoticeScope
+)
+from src.user.models import RoleTier, User
+
+
+def _company_user_ids(user: User, db: Session) -> list[int]:
+    clean_company = (user.company_name or "").strip().lower()
+    rows = db.query(User.id).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).all()
+    return [r.id for r in rows]
+
 
 # --- Notice Board Logic ---
 def create_notice(data: CommunicationCreate, current_user: User, db: Session) -> Communication:
-    if data.scope == NoticeScope.ALL and current_user.role_tier != RoleTier.ADMIN:
+    if data.scope == NoticeScope.ALL and current_user.role_tier not in [RoleTier.ADMIN, RoleTier.HR]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Admins can publish organization-wide notices."
+            detail="Only Admins or HR can publish organization-wide notices."
         )
 
-    if current_user.role_tier == RoleTier.MEMBER:
+    if current_user.role_tier in [RoleTier.MEMBER, RoleTier.INTERN]:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Members do not have permission to post broadcasts."
+            detail="Members and Interns do not have permission to post broadcasts."
         )
 
     notice = Communication(
-        title=data.title,
-        content=data.content,
+        title=data.title.strip(),
+        content=data.content.strip(),
         scope=data.scope,
         author_id=current_user.id
     )
@@ -42,21 +52,42 @@ def create_notice(data: CommunicationCreate, current_user: User, db: Session) ->
     db.refresh(notice)
     return notice
 
+
 def get_visible_notices(current_user: User, db: Session) -> List[Communication]:
-    if current_user.role_tier == RoleTier.ADMIN:
-        return db.query(Communication).order_by(Communication.created_at.desc()).all()
+    company_ids = _company_user_ids(current_user, db)
+    if not company_ids:
+        return []
+
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
+        return (
+            db.query(Communication)
+            .filter(Communication.author_id.in_(company_ids))
+            .order_by(Communication.created_at.desc())
+            .all()
+        )
 
     manager_chain = []
+    visited = {current_user.id}
     curr = current_user.manager
-    while curr:
+    while curr and curr.id not in visited:
+        visited.add(curr.id)
         manager_chain.append(curr.id)
         curr = curr.manager
 
-    return db.query(Communication).filter(
-        (Communication.scope == NoticeScope.ALL) |
-        (Communication.author_id.in_(manager_chain)) |
-        (Communication.author_id == current_user.id)
-    ).order_by(Communication.created_at.desc()).all()
+    return (
+        db.query(Communication)
+        .filter(
+            Communication.author_id.in_(company_ids),
+            or_(
+                Communication.scope == NoticeScope.ALL,
+                Communication.author_id.in_(manager_chain),
+                Communication.author_id == current_user.id
+            )
+        )
+        .order_by(Communication.created_at.desc())
+        .all()
+    )
+
 
 # --- Member-to-Member Chat Request & Direct Messaging Logic ---
 def send_chat_invite(data: SendChatInviteRequest, current_user: User, db: Session):
@@ -64,6 +95,17 @@ def send_chat_invite(data: SendChatInviteRequest, current_user: User, db: Sessio
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="You cannot send a chat invite to yourself."
+        )
+
+    clean_company = (current_user.company_name or "").strip().lower()
+    receiver = db.query(User).filter(
+        User.id == data.receiver_id,
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).first()
+    if not receiver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Teammate not found in your workspace."
         )
 
     existing = db.query(ChatRequest).filter(
@@ -78,8 +120,18 @@ def send_chat_invite(data: SendChatInviteRequest, current_user: User, db: Sessio
             raise HTTPException(status_code=400, detail="Chat is already active between both of you.")
         if existing.status == ChatRequestStatus.PENDING:
             raise HTTPException(status_code=400, detail="A chat invite is already pending.")
-        if existing.status == ChatRequestStatus.DECLINED and existing.sender_id == current_user.id:
-            raise HTTPException(status_code=400, detail="Chat invitation was previously declined.")
+        if existing.status in [ChatRequestStatus.DECLINED, ChatRequestStatus.IGNORED]:
+            if existing.sender_id == current_user.id:
+                raise HTTPException(status_code=400, detail="Chat invitation was previously declined.")
+            # Allow the teammate who previously declined/ignored to re-initiate cleanly
+            existing.sender_id = current_user.id
+            existing.receiver_id = data.receiver_id
+            existing.status = ChatRequestStatus.PENDING
+            existing.initial_message = data.initial_message
+            existing.initial_attachment_url = data.initial_attachment_url
+            db.commit()
+            db.refresh(existing)
+            return existing
 
     invite = ChatRequest(
         sender_id=current_user.id,
@@ -93,6 +145,7 @@ def send_chat_invite(data: SendChatInviteRequest, current_user: User, db: Sessio
     db.refresh(invite)
     return invite
 
+
 def respond_to_chat_invite(request_id: int, data: RespondChatInviteRequest, current_user: User, db: Session):
     invite = db.query(ChatRequest).filter(
         ChatRequest.id == request_id,
@@ -104,7 +157,6 @@ def respond_to_chat_invite(request_id: int, data: RespondChatInviteRequest, curr
 
     invite.status = data.status
 
-    # Move the initial message/file into chat history once accepted
     if data.status == ChatRequestStatus.ACCEPTED and (invite.initial_message or invite.initial_attachment_url):
         first_msg = DirectMessage(
             sender_id=invite.sender_id,
@@ -118,13 +170,26 @@ def respond_to_chat_invite(request_id: int, data: RespondChatInviteRequest, curr
     db.refresh(invite)
     return invite
 
+
 def get_pending_chat_invites(current_user: User, db: Session):
     return db.query(ChatRequest).filter(
         ChatRequest.receiver_id == current_user.id,
         ChatRequest.status == ChatRequestStatus.PENDING
     ).all()
 
+
 def send_direct_message(data: SendMessageRequest, current_user: User, db: Session):
+    clean_company = (current_user.company_name or "").strip().lower()
+    receiver = db.query(User).filter(
+        User.id == data.receiver_id,
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).first()
+    if not receiver:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Teammate not found in your workspace."
+        )
+
     active_connection = db.query(ChatRequest).filter(
         ChatRequest.status == ChatRequestStatus.ACCEPTED,
         or_(
@@ -149,6 +214,7 @@ def send_direct_message(data: SendMessageRequest, current_user: User, db: Sessio
     db.commit()
     db.refresh(msg)
     return msg
+
 
 def get_conversation_history(partner_id: int, current_user: User, db: Session):
     return db.query(DirectMessage).filter(

@@ -1,5 +1,5 @@
 from calendar import monthrange
-from datetime import date, datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from math import atan2, cos, radians, sin, sqrt
 from typing import Optional
 
@@ -31,6 +31,14 @@ COMPANY_LAT = 28.4595
 COMPANY_LNG = 77.0266
 MAX_RADIUS_METERS = 500.0
 OFFICE_SUBNET_PREFIX = "192.168.100."
+
+
+def _company_user_ids(user: User, db: Session) -> list[int]:
+    clean_company = (user.company_name or "").strip().lower()
+    rows = db.query(User.id).filter(
+        func.lower(func.trim(User.company_name)) == clean_company
+    ).all()
+    return [r.id for r in rows]
 
 
 def get_utc_now() -> datetime:
@@ -97,7 +105,6 @@ def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db
             detail="You are already punched in for today."
         )
 
-    # Optional GPS geofence check ONLY when browser sends valid coordinates
     lat = getattr(data, "latitude", None)
     lng = getattr(data, "longitude", None)
     if lat is not None and lng is not None:
@@ -108,7 +115,6 @@ def punch_in_user(request: Request, data: PunchInRequest, current_user: User, db
                 detail=f"Geofence Error: You are {round(distance)} meters away from the office."
             )
 
-    # If user already checked out earlier today, resume today's row so daily hours accumulate cleanly
     if existing and existing.punch_out is not None:
         existing.punch_in = now
         existing.punch_out = None
@@ -184,15 +190,18 @@ def get_team_attendance_summary(query_date: Optional[date], current_user: User, 
     if not query_date:
         query_date = get_utc_now().date()
 
-    subordinate_ids = get_subordinate_ids(current_user) or []
-
-    if current_user.role_tier == RoleTier.ADMIN:
-        records = db.query(Attendance).filter(Attendance.date == query_date).all()
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
+        company_ids = _company_user_ids(current_user, db)
+        records = db.query(Attendance).filter(
+            Attendance.date == query_date,
+            Attendance.user_id.in_(company_ids)
+        ).all() if company_ids else []
     else:
+        subordinate_ids = get_subordinate_ids(current_user) or []
         records = db.query(Attendance).filter(
             Attendance.date == query_date,
             Attendance.user_id.in_(subordinate_ids)
-        ).all()
+        ).all() if subordinate_ids else []
 
     return TeamAttendanceReport(
         date=query_date,
@@ -248,13 +257,20 @@ def submit_regularization_request(
 
 
 def list_regularization_requests(current_user: User, db: Session):
-    if current_user.role_tier == RoleTier.ADMIN:
-        return db.query(AttendanceRegularization).order_by(AttendanceRegularization.created_at.desc()).all()
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
+        company_ids = _company_user_ids(current_user, db)
+        if not company_ids:
+            return []
+        return db.query(AttendanceRegularization).filter(
+            AttendanceRegularization.user_id.in_(company_ids)
+        ).order_by(AttendanceRegularization.created_at.desc()).all()
+
     if current_user.role_tier == RoleTier.MANAGER:
         sub_ids = (get_subordinate_ids(current_user) or []) + [current_user.id]
         return db.query(AttendanceRegularization).filter(
             AttendanceRegularization.user_id.in_(sub_ids)
         ).order_by(AttendanceRegularization.created_at.desc()).all()
+
     return db.query(AttendanceRegularization).filter(
         AttendanceRegularization.user_id == current_user.id
     ).order_by(AttendanceRegularization.created_at.desc()).all()
@@ -266,18 +282,32 @@ def review_regularization_request(
     current_user: User,
     db: Session
 ) -> AttendanceRegularization:
-    if current_user.role_tier == RoleTier.MEMBER:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Only Managers or Admins can review regularization requests."
-        )
-
     req = db.query(AttendanceRegularization).filter(AttendanceRegularization.id == request_id).first()
     if not req:
         raise HTTPException(status_code=404, detail="Regularization request not found.")
 
-    if req.user_id == current_user.id and current_user.role_tier != RoleTier.ADMIN:
-        raise HTTPException(status_code=403, detail="You cannot approve your own regularization.")
+    applicant = db.query(User).filter(User.id == req.user_id).first()
+    if not applicant or (applicant.company_name or "").strip().lower() != (current_user.company_name or "").strip().lower():
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Request belongs to a different workspace.")
+
+    if current_user.role_tier == RoleTier.ADMIN:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin manages workspace operations; Attendance regularizations are approved by the reporting Manager or HR."
+        )
+
+    is_direct_manager = (
+        current_user.role_tier == RoleTier.MANAGER
+        and req.user_id != current_user.id
+        and (applicant.manager_id == current_user.id or req.user_id in (get_subordinate_ids(current_user) or []))
+    )
+    is_hr = current_user.role_tier == RoleTier.HR and req.user_id != current_user.id
+
+    if not (is_direct_manager or is_hr):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only the member's reporting Manager or HR can review regularization requests."
+        )
 
     req.status = data.status
     req.reviewed_by_id = current_user.id

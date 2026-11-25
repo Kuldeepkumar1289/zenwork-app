@@ -39,12 +39,12 @@ def calculate_performance_metrics(current_user: User, db: Session) -> Performanc
     now = datetime.now(timezone.utc).replace(tzinfo=None)
     clean_company = (current_user.company_name or "").strip().lower()
 
-    # Hierarchy + Company scope resolution
-    if current_user.role_tier == RoleTier.ADMIN:
+    # Hierarchy + Company scope resolution across all 6 roles
+    if current_user.role_tier in [RoleTier.ADMIN, RoleTier.HR]:
         relevant_users = db.query(User).filter(
             func.lower(func.trim(User.company_name)) == clean_company
         ).all()
-    elif current_user.role_tier == RoleTier.MANAGER:
+    elif current_user.role_tier in [RoleTier.MANAGER, RoleTier.TEAM_LEAD]:
         subordinate_ids = _get_safe_subordinate_ids(current_user, db)
         relevant_users = db.query(User).filter(
             User.id.in_(subordinate_ids + [current_user.id]),
@@ -60,10 +60,10 @@ def calculate_performance_metrics(current_user: User, db: Session) -> Performanc
     total_assigned = len(tasks)
     completed_tasks = sum(1 for t in tasks if t.status == TaskStatus.COMPLETED)
 
-    # 2. Overdue tasks calculation
+    # 2. Overdue tasks calculation (includes tasks pending TL/Manager review)
     overdue_tasks = sum(
         1 for t in tasks
-        if t.status in [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.BLOCKED]
+        if t.status in [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.PENDING_REVIEW, TaskStatus.BLOCKED]
         and t.due_date and t.due_date < now
     )
 
@@ -89,14 +89,19 @@ def calculate_performance_metrics(current_user: User, db: Session) -> Performanc
     workload_list = []
     for member in relevant_users:
         member_tasks = [t for t in tasks if t.assigned_to_id == member.id]
-        active = sum(1 for t in member_tasks if t.status in [TaskStatus.TODO, TaskStatus.IN_PROGRESS])
+        active = sum(1 for t in member_tasks if t.status in [TaskStatus.TODO, TaskStatus.IN_PROGRESS, TaskStatus.PENDING_REVIEW])
+        pending_rev = sum(1 for t in member_tasks if t.status == TaskStatus.PENDING_REVIEW)
         blocked = sum(1 for t in member_tasks if t.status == TaskStatus.BLOCKED)
+        role_val = member.role_tier.value if hasattr(member.role_tier, "value") else str(member.role_tier)
 
         workload_list.append(
             MemberWorkloadMetric(
                 user_id=member.id,
+                employee_code=getattr(member, "employee_code", None),
                 full_name=member.full_name,
+                role_tier=role_val,
                 active_tasks=active,
+                pending_review_tasks=pending_rev,
                 blocked_tasks=blocked,
                 burnout_risk=active >= 4
             )

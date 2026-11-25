@@ -35,7 +35,7 @@ def _verify_same_company(target_user: User, admin_user: User) -> None:
         )
 
 
-# 1. User Role & Hierarchy Modification (Scoped to Admin's Company)
+# 1. User Role, Employee ID & Hierarchy Modification (Scoped to Admin's Company)
 def admin_update_user(user_id: int, data: AdminUserUpdate, admin_user: User, db: Session):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -53,19 +53,37 @@ def admin_update_user(user_id: int, data: AdminUserUpdate, admin_user: User, db:
                 detail="Maximum limit of 3 Admins per organization reached. Demote an existing admin first."
             )
 
-    if data.manager_id is not None:
-        if data.manager_id == user_id:
-            raise HTTPException(status_code=400, detail="User cannot report to themselves.")
-        manager = db.query(User).filter(User.id == data.manager_id).first()
-        if not manager:
-            raise HTTPException(status_code=404, detail="Target manager not found.")
-        _verify_same_company(manager, admin_user)
-        user.manager_id = data.manager_id
+    if "employee_code" in data.model_fields_set:
+        clean_emp_code = (data.employee_code or "").strip().upper() or None
+        if clean_emp_code:
+            duplicate = db.query(User).filter(
+                User.id != user_id,
+                func.lower(func.trim(User.company_name)) == (admin_user.company_name or "").strip().lower(),
+                func.upper(func.trim(User.employee_code)) == clean_emp_code
+            ).first()
+            if duplicate:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Employee ID '{clean_emp_code}' is already assigned to {duplicate.full_name}."
+                )
+        user.employee_code = clean_emp_code
 
-    if data.full_name is not None:
-        user.full_name = data.full_name
-    if data.designation is not None:
-        user.designation = data.designation
+    if "manager_id" in data.model_fields_set:
+        if data.manager_id is None or data.manager_id == 0:
+            user.manager_id = None
+        else:
+            if data.manager_id == user_id:
+                raise HTTPException(status_code=400, detail="User cannot report to themselves.")
+            manager = db.query(User).filter(User.id == data.manager_id).first()
+            if not manager:
+                raise HTTPException(status_code=404, detail="Target manager not found.")
+            _verify_same_company(manager, admin_user)
+            user.manager_id = data.manager_id
+
+    if data.full_name is not None and data.full_name.strip():
+        user.full_name = data.full_name.strip()
+    if data.designation is not None and data.designation.strip():
+        user.designation = data.designation.strip()
     if data.role_tier is not None:
         user.role_tier = data.role_tier
 
@@ -92,7 +110,7 @@ def admin_override_task(task_id: int, data: AdminTaskOverride, admin_user: User,
     company_ids = _get_company_user_ids(admin_user.company_name, db)
     task = db.query(Task).filter(
         Task.id == task_id,
-        Task.assigned_to_id.in_(company_ids)
+        (Task.assigned_to_id.in_(company_ids)) | (Task.created_by_id.in_(company_ids))
     ).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found in your organization.")
@@ -112,7 +130,7 @@ def admin_delete_task(task_id: int, admin_user: User, db: Session):
     company_ids = _get_company_user_ids(admin_user.company_name, db)
     task = db.query(Task).filter(
         Task.id == task_id,
-        Task.assigned_to_id.in_(company_ids)
+        (Task.assigned_to_id.in_(company_ids)) | (Task.created_by_id.in_(company_ids))
     ).first()
     if not task:
         raise HTTPException(status_code=404, detail="Task not found in your organization.")
@@ -157,7 +175,9 @@ def get_admin_workspace_overview(admin_user: User, db: Session):
         }
 
     company_task_ids = [
-        t[0] for t in db.query(Task.id).filter(Task.assigned_to_id.in_(company_ids)).all()
+        t[0] for t in db.query(Task.id).filter(
+            (Task.assigned_to_id.in_(company_ids)) | (Task.created_by_id.in_(company_ids))
+        ).all()
     ]
 
     return {

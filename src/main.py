@@ -1,36 +1,41 @@
 import os
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from src.utils.db import Base, engine
-from src.user.router import user_router
-from src.tasks.router import task_router
-from src.queries.router import query_router
+import src.attendance.models
+import src.calendar_events.models
+import src.communications.models
+import src.events.models
+import src.queries.models
+import src.tasks.models
+import src.user.models
+
+from src.admin.router import admin_router
+from src.analytics.router import analytics_router
 from src.attendance.router import attendance_router
+from src.calendar_events.router import calendar_router
 from src.communications.router import comm_router
 from src.communications.voice_router import upload_router
-from src.calendar_events.router import calendar_router
-from src.analytics.router import analytics_router
-from src.worker.scheduler import start_scheduler, stop_scheduler
-from src.admin.router import admin_router
-from src.events import models as event_models
 from src.events.router import router as events_router
-from fastapi.responses import JSONResponse
-from fastapi import Request
-import src.user.models
-import src.tasks.models
-import src.attendance.models
+from src.queries.router import query_router
+from src.tasks.router import task_router
+from src.user.router import user_router
+from src.utils.db import Base, engine
+from src.worker.scheduler import start_scheduler, stop_scheduler
 
 # Ensure all database tables exist
 Base.metadata.create_all(bind=engine)
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     start_scheduler()
     yield
     stop_scheduler()
+
 
 app = FastAPI(
     title="Zenwork Workspace",
@@ -56,8 +61,6 @@ app.include_router(upload_router, prefix="/api/v1")
 app.include_router(admin_router, prefix="/api/v1")
 app.include_router(events_router, prefix="/api/v1")
 
-
-
 # CORS Middleware
 app.add_middleware(
     CORSMiddleware,
@@ -65,11 +68,18 @@ app.add_middleware(
         "https://zenwork-frontend-1qja.onrender.com",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+        "http://localhost:5500",
+        "http://127.0.0.1:5500",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
     ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -81,6 +91,7 @@ async def global_exception_handler(request: Request, exc: Exception):
             "Access-Control-Allow-Credentials": "true",
         },
     )
+
 
 @app.get("/")
 def health_check():

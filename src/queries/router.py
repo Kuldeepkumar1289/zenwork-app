@@ -1,30 +1,36 @@
 from typing import List
 from fastapi import APIRouter, Depends, status
 from sqlalchemy.orm import Session
+
+from src.queries.dtos import QueryCreate, QueryResolve, QueryResponse
+from src.queries.service import list_queries, raise_query, resolve_query
+from src.user.models import User
 from src.utils.db import get_db
 from src.utils.dependencies import get_current_user
-from src.user.models import User
-from src.queries.dtos import QueryCreate, QueryResponse, QueryResolve
-from src.queries.service import raise_query, resolve_query, list_queries
 
 query_router = APIRouter(prefix="/queries", tags=["Inter-Department Queries & SLA"])
 
+
 @query_router.post("", response_model=QueryResponse, status_code=status.HTTP_201_CREATED)
+@query_router.post("/", response_model=QueryResponse, status_code=status.HTTP_201_CREATED, include_in_schema=False)
 def create_new_query(
     data: QueryCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """Raise a query to another department (DevOps, QA, Infra, etc.)."""
+    """Raise a query to another department (DevOps, QA, HR, Engineering, etc.)."""
     return raise_query(data=data, current_user=current_user, db=db)
 
+
 @query_router.get("", response_model=List[QueryResponse])
+@query_router.get("/", response_model=List[QueryResponse], include_in_schema=False)
 def get_all_queries(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    """List relevant cross-department queries."""
+    """List relevant cross-department queries within the user's organization."""
     return list_queries(current_user=current_user, db=db)
+
 
 @query_router.patch("/{query_id}/resolve", response_model=QueryResponse)
 def resolve_existing_query(
